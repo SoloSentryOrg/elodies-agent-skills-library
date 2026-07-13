@@ -16,6 +16,9 @@
 - Every requested report section is present or explicitly marked not applicable with rationale.
 - VS Code and Visual Studio parts each stand alone and contain their own decision, evidence, controls, limitations, confidence, and framework mapping.
 - Likelihood × impact calculations and rating bands are correct; residual risk reflects verified controls.
+- Every consolidated risk-register table has a complete column/scoring legend
+  immediately above it, including definitions for all abbreviations and the
+  rating bands; the reader does not need to search elsewhere in the report.
 - Framework editions and regulatory status are current and accurately characterized.
 - Findings link to evidence, controls, owners, priorities, and verification tests.
 - Approval scope includes version, IDE, conditions, review date/trigger, and unresolved blockers.

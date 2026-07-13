@@ -42,6 +42,34 @@ Do not subtract control strength mechanically. Re-score residual likelihood and 
 - recommended remediation, priority, owner, target date, verification test
 - framework mappings and confidence
 
+## Risk-register legend
+
+Place a concise legend immediately above every consolidated risk-register
+table. Do not place it only in an earlier methodology section or after the
+table. The reader must be able to interpret the table without searching
+elsewhere in the report.
+
+Define every abbreviated or scored column used by the table. At minimum, when
+the corresponding columns are present, define:
+
+- `ID`: unique finding or risk identifier;
+- `Risk`: concise description of the adverse scenario;
+- `Scope`: affected IDE, version, component, service, or environment;
+- `L`: inherent likelihood before controls, scored 1–5;
+- `I`: inherent impact before controls, scored 1–5;
+- `Inherent`: `L × I`, followed by the applicable rating;
+- `rL`: residual likelihood after considering verified controls, scored 1–5;
+- `rI`: residual impact after considering verified controls, scored 1–5;
+- `Residual`: `rL × rI`, followed by the applicable rating;
+- `Treatment`: recommended action to reduce, avoid, transfer, or formally
+  accept the residual risk; and
+- `Owner`: role accountable for the treatment and its verification evidence.
+
+Include the rating bands in the same legend: `1–4 Low`, `5–9 Moderate`,
+`10–16 High`, and `17–25 Critical`. If the table uses different or additional
+headers, define those headers too. Prefer fully expanded column labels when
+layout permits, but retain the legend even when labels are expanded.
+
 ## Confidence
 
 - **High:** direct observation and corroborating primary evidence; version-specific.
