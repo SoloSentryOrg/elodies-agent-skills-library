@@ -23,6 +23,8 @@ description: Research and assess AI-related Visual Studio and VS Code extensions
 
 ## Preliminary identity and intake gate
 
+Before assessment, read [references/prerequisites.md](references/prerequisites.md) and classify the environment as ready, partially ready, or blocked. Require only the baseline capabilities plus the tools needed for the selected analysis branches and deliverables; record substitutions and material gaps.
+
 Use a read-only preliminary marketplace search to resolve likely identity candidates when the user provides only a display name. Then ask only unresolved, material questions before full research. Permit partial answers and record assumptions. Use [references/intake.md](references/intake.md). Runtime analysis defaults to **No** and must be asked explicitly. Confirm at minimum:
 
 - exact extension name and marketplace/publisher;
