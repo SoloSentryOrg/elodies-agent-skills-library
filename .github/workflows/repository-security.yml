@@ -1,0 +1,36 @@
+name: Repository Security
+
+on:
+  pull_request:
+    branches: [main]
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: repository-security-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  repository-security:
+    name: Repository Security Gate
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+
+      - name: Validate repository and skills
+        run: ruby scripts/validate_repository.rb
+
+      - name: Validate lessons-learned evidence
+        if: github.event_name == 'pull_request'
+        env:
+          GITHUB_EVENT_PATH: ${{ github.event_path }}
+        run: python3 scripts/check-lessons-evidence.py
