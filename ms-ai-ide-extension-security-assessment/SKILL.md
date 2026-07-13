@@ -13,6 +13,11 @@ description: Research and assess AI-related Visual Studio and VS Code extensions
 - Separate `Verified`, `Inferred`, `Not observed`, `Not applicable`, and `Unknown`. Never equate missing public evidence with absence.
 - Default to a professional `.docx`. Invoke the available Word/document skill and obey its create, render, inspect, accessibility, and privacy-QA requirements.
 - Keep the VS Code and Visual Studio assessments self-contained, even when this requires controlled repetition.
+- Treat internal lessons-learned systems, central registers, lesson IDs, RCA
+  records, governance evidence, and related workflow details as proprietary
+  internal material. They may inform internal planning and quality control, but
+  must not appear in an assessment report, appendix, evidence register,
+  reference list, or derivative.
 - Do not perform runtime analysis unless intake says Yes. Static package download and inspection are allowed by default; executing or installing the extension is runtime analysis.
 - Apply least privilege, secure-by-default design, defense in depth, OWASP guidance, and safe handling of potentially malicious packages.
 

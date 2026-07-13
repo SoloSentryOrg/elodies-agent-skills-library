@@ -53,6 +53,10 @@ This part may hold the full common analysis, but it does not replace the complet
 4. Enterprise Controls Roadmap
 5. Detection Opportunities and Monitoring Plan
 6. Consolidated Risk Register
+   - Place the scoring and column-header legend immediately above the table.
+     Define every abbreviation and include the risk-rating bands. Follow
+     [scoring.md](scoring.md); do not rely on definitions elsewhere in the
+     report.
 7. Residual Risk and Approval Recommendation
 8. Limitations and Confidence Levels
 9. Evidence Register
