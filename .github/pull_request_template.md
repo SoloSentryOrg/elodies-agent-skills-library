@@ -19,7 +19,7 @@
 - Active RCA files reviewed:
 - Applicable lesson IDs and controls:
 - Considered but not applicable:
-- If no central lesson applies, rationale:
+- No applicable central lesson. Rationale:
 - Complexity removed or justified:
 
 ## Verification

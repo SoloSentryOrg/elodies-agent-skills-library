@@ -1,6 +1,6 @@
 # Elodie's Agent Skills Library
 
-Private, governed collection of reusable Agent Skills maintained for SoloSentry use.
+Governed collection of reusable Agent Skills maintained by SoloSentry for public review and reuse.
 
 ## Skills
 
@@ -10,7 +10,7 @@ Private, governed collection of reusable Agent Skills maintained for SoloSentry 
 
 ## Repository model
 
-- Private SoloSentryOrg repository with one maintainer.
+- Public SoloSentryOrg repository maintained through a single-maintainer governance model.
 - All substantive changes use a branch and pull request.
 - `main` is protected by repository rules and required validation.
 - Skill instructions and supporting files are treated as security-sensitive behavioral code.
@@ -32,3 +32,7 @@ python3 scripts/check-lessons-evidence.py --changed-file example-skill/SKILL.md 
 ## Security
 
 Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Do not open a public issue containing exploit details, credentials, sensitive prompts, or private repository content.
+
+## Licence
+
+This repository is licensed under the [MIT License](LICENSE).

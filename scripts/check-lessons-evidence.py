@@ -23,7 +23,9 @@ NOT_APPLICABLE_RE = re.compile(
     r"\b(no|none)\s+applicable\s+(central\s+)?lessons?\b|\bcentral\s+lessons?\s*:\s*(n/a|not applicable|none)\b",
     re.IGNORECASE,
 )
-RATIONALE_RE = re.compile(r"\b(rationale|reason|why)\s*:", re.IGNORECASE)
+RATIONALE_RE = re.compile(
+    r"(?im)^\s*(?:-\s*)?.*\b(?:rationale|reason|why)\s*:\s*\S.*$"
+)
 DEFAULT_SCOPED_PATTERNS = (
     r"^AGENTS[.]md$",
     r"^[.]github/(workflows|ISSUE_TEMPLATE)/",
