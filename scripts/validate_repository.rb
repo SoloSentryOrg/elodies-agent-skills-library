@@ -33,9 +33,9 @@ ROOT.find do |path|
 
   if relative.start_with?(".github/workflows/")
     path.each_line.with_index(1) do |line, number|
-      next unless line.match?(/^\s*uses:\s*/)
+      next unless line.match?(/^\s*(?:-\s*)?uses:\s*/)
       next if line.match?(/uses:\s*\.\//)
-      next if line.match?(/@[0-9a-f]{40}(?:\s|#|$)/)
+      next if line.match?(/@[0-9a-fA-F]{40}(?:\s|#|$)/)
 
       errors << "unpinned action: #{relative}:#{number}"
     end
