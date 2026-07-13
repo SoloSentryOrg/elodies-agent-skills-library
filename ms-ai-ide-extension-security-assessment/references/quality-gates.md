@@ -7,6 +7,9 @@
 - “None,” “no evidence,” and “not installed” claims state the inspection scope and evidence state.
 - Package handling remained static unless runtime analysis was authorized.
 - Secrets, personal data, tokens, proprietary code, and unsafe URLs are absent from the deliverable and logs.
+- Internal lessons-learned registers, lesson IDs, RCA records, governance
+  evidence, and related proprietary workflow details are absent from the
+  report and all derivatives, even when they informed internal work.
 - Agent Skills are distinguished from MCP tools, prompts, and resources and assessed independently.
 - Cross-tool and multi-MCP composition risks are assessed.
 - If malware review is Yes, hashes/signatures, reputation/advisories, static scans, IOC/YARA results where available, obfuscation/native-code triage, source-package comparison, scan limitations, and detonation status are recorded.
