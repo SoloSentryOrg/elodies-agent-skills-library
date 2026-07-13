@@ -29,6 +29,9 @@ jobs:
       - name: Validate repository and skills
         run: ruby scripts/validate_repository.rb
 
+      - name: Run lessons-evidence regression tests
+        run: python3 -m unittest discover -s scripts -p 'test_*.py'
+
       - name: Validate lessons-learned evidence
         if: github.event_name == 'pull_request'
         env:
