@@ -1,6 +1,6 @@
 # Elodie's Agent Skills Library
 
-Governed collection of reusable Agent Skills maintained by SoloSentry for public review and reuse.
+A collection of reusable Agent Skills maintained by SoloSentry for public review and reuse.
 
 ## Skills
 
@@ -10,7 +10,6 @@ Governed collection of reusable Agent Skills maintained by SoloSentry for public
 
 ## Repository model
 
-- Public SoloSentryOrg repository maintained through a single-maintainer governance model.
 - All substantive changes use a branch and pull request.
 - `main` is protected by repository rules and required validation.
 - Skill instructions and supporting files are treated as security-sensitive behavioral code.
