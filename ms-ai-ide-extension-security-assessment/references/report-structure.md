@@ -27,7 +27,7 @@ Repeat enough product context for this part to stand alone:
 9. MCP surface and installed skills, including a complete per-skill decision/risk summary for every skill applicable to this IDE
 10. Supply-chain and dependency assessment
 11. Threat scenarios and findings
-12. OWASP LLM, Agentic AI, MCP (if applicable), MITRE ATLAS, NIST AI RMF, ASVS, CIS, ISO 27001, NCSC, FCA/PRA/UK-sector mappings
+12. Framework-disposition table and mappings: complete minimum baseline; conditional OWASP MCP, OWASP ASVS, privacy, FCA/PRA, jurisdictional and sector requirements
 13. Enterprise controls and detection opportunities
 14. Residual risk, confidence, limitations, and approval recommendation
 15. VS Code evidence and host-verification actions

@@ -75,8 +75,8 @@ skill_roots.each do |skill_root|
     next
   end
 
-  unless metadata.is_a?(Hash) && metadata.keys.sort == %w[description name]
-    errors << "frontmatter must contain only name and description: #{skill_file.relative_path_from(ROOT)}"
+  unless metadata.is_a?(Hash) && metadata.keys.sort == %w[description metadata name]
+    errors << "frontmatter must contain name, description, and metadata: #{skill_file.relative_path_from(ROOT)}"
     next
   end
 
@@ -84,6 +84,15 @@ skill_roots.each do |skill_root|
   errors << "skill name mismatch: #{expected_name}" unless metadata["name"] == expected_name
   errors << "invalid skill name: #{expected_name}" unless expected_name.match?(/\A[a-z0-9]+(?:-[a-z0-9]+)*\z/) && expected_name.length < 64
   errors << "empty description: #{expected_name}" unless metadata["description"].is_a?(String) && !metadata["description"].strip.empty?
+  skill_metadata = metadata["metadata"]
+  unless skill_metadata.is_a?(Hash) && skill_metadata.all? { |key, value| key.is_a?(String) && value.is_a?(String) }
+    errors << "metadata must be a string-to-string mapping: #{expected_name}"
+  else
+    version = skill_metadata["version"]
+    unless version.is_a?(String) && version.match?(/\A(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)\.(?:0|[1-9][0-9]*)(?:-[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?(?:\+[0-9A-Za-z-]+(?:\.[0-9A-Za-z-]+)*)?\z/)
+      errors << "metadata.version must be a quoted semantic version: #{expected_name}"
+    end
+  end
 
   text.scan(/\]\((references\/[^)]+)\)/).flatten.each do |reference|
     errors << "missing reference: #{expected_name}/#{reference}" unless skill_root.join(reference).file?
