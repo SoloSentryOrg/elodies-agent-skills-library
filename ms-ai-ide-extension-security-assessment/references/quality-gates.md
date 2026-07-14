@@ -23,6 +23,8 @@
   immediately above it, including definitions for all abbreviations and the
   rating bands; the reader does not need to search elsewhere in the report.
 - Framework editions and regulatory status are current and accurately characterized.
+- Every minimum-baseline framework is mapped in each applicable IDE part; every conditional framework has an evidence-backed `Applicable` or `Not applicable` disposition.
+- OWASP ASVS mappings state the edition, verification level and applicable requirement identifiers; a `Not applicable` disposition identifies the inspected application surface and rationale.
 - Findings link to evidence, controls, owners, priorities, and verification tests.
 - Approval scope includes version, IDE, conditions, review date/trigger, and unresolved blockers.
 

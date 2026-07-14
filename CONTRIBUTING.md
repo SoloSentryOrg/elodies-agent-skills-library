@@ -14,8 +14,9 @@
 ## Skill requirements
 
 - Use a lowercase hyphenated directory directly under the repository root.
-- Include a valid `SKILL.md` with only `name` and `description` in YAML frontmatter.
+- Include a valid `SKILL.md` with `name`, `description`, and a quoted semantic version at `metadata.version` in YAML frontmatter.
 - Make the frontmatter name match the directory name.
+- Start maintained skills at `1.0.0`. Increment the major version for incompatible behavior or output-contract changes, the minor version for backward-compatible capability or assessment-scope additions, and the patch version for backward-compatible corrections. Update the version in the same pull request as the release change.
 - Keep the entry point concise and use one-level references for detailed guidance.
 - Include `agents/openai.yaml` when UI metadata improves discoverability.
 - Do not add opaque binaries, credentials, local state, or unreviewed generated output.
