@@ -36,3 +36,12 @@
 - Verify live GitHub settings after changing rulesets, security features, merge settings, Actions, or permissions.
 - Run `ruby scripts/validate_repository.rb` and the lessons evidence check before publication.
 - Keep findings open until fixed or explicitly risk-accepted; scanner output is evidence, not approval.
+
+
+## End-Of-Task Local Docker Cleanup
+
+- At the end of any task that uses the local Docker installation, inventory the images, containers, volumes, and build cache created or used by the task.
+- Remove task-used local container images when the exact image is confirmed available from the organization GHCR or another trusted registry and no local container or follow-on task still depends on it.
+- Verify remote availability by immutable digest before removal; do not rely only on a mutable tag, cached metadata, or memory.
+- Remove stopped task containers and task-specific unused build cache when they are no longer needed, but do not remove unrelated images, volumes, caches, or installed Docker Desktop extension images.
+- Do not use broad prune commands when ownership or dependency scope is uncertain. Record what was removed, what was preserved, and why; if cleanup cannot be completed safely, report the residual local artifacts and the blocking reason.
