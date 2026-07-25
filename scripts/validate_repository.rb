@@ -43,13 +43,30 @@ ROOT.find do |path|
 end
 
 reserved = %w[.git .github scripts]
+artifact_roots = %w[reports]
+report_extensions = %w[.docx .in .json .md .png .py .txt].freeze
+reports_root = ROOT.join("reports")
+if reports_root.directory?
+  reports_root.find do |path|
+    next if path.directory?
+
+    relative = path.relative_path_from(ROOT).to_s
+    errors << "unsupported report artifact: #{relative}" unless report_extensions.include?(path.extname.downcase)
+  end
+end
+
 skill_roots = ROOT.children.select do |path|
-  path.directory? && !reserved.include?(path.basename.to_s) && path.join("SKILL.md").file?
+  path.directory? &&
+    !reserved.include?(path.basename.to_s) &&
+    !artifact_roots.include?(path.basename.to_s) &&
+    path.join("SKILL.md").file?
 end.sort
 errors << "no skills found" if skill_roots.empty?
 
 ROOT.children.select(&:directory?).each do |path|
-  next if reserved.include?(path.basename.to_s) || path.join("SKILL.md").file?
+  next if reserved.include?(path.basename.to_s) ||
+          artifact_roots.include?(path.basename.to_s) ||
+          path.join("SKILL.md").file?
 
   errors << "unexpected root directory without SKILL.md: #{path.basename}"
 end
