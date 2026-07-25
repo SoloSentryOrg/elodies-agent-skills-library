@@ -1,0 +1,22 @@
+{
+  "assessment": "Microsoft MarkItDown 0.1.6",
+  "generated_at": "2026-07-25T16:08:34Z",
+  "classification": "Internal Confidential",
+  "stages": [
+    {"id": 1, "file": "01-intake-readiness.md"},
+    {"id": 2, "file": "02-evidence-plan-register.md"},
+    {"id": 3, "file": "03-acquisition-provenance.md"},
+    {"id": 4, "file": "04-static-inspection.md"},
+    {"id": 5, "file": "05-per-ide-installation.md"},
+    {"id": 6, "file": "06-architecture-data-privacy.md"},
+    {"id": 7, "file": "07-runtime-analysis.md"},
+    {"id": 8, "file": "08-malware-supply-chain.md"},
+    {"id": 9, "file": "09-sbom-vulnerabilities.md"},
+    {"id": 10, "file": "10-mcp-skills.md"},
+    {"id": 11, "file": "11-privacy-regulatory.md"},
+    {"id": 12, "file": "12-framework-mappings.md"},
+    {"id": 13, "file": "13-findings-risk-register.md"},
+    {"id": 14, "file": "14-controls-monitoring.md"},
+    {"id": 15, "file": "15-claims-qa.md"}
+  ]
+}
