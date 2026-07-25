@@ -15,6 +15,10 @@ Authoritative reports and retained, non-sensitive evidence are published under
 support and evidence, records static, malware and authorized runtime-analysis
 coverage, and gives an explicit approval recommendation.
 
+The repository is the central assessment library. Every assessment is stored in
+its own directory with the authoritative DOCX report and any available retained
+evidence, stage outputs and reproducible build material.
+
 Agent Skills are reviewed when they are bundled with, installed by, or required
 for the assessed extension or MCP integration. They are treated as
 security-sensitive behavioral code and assessed alongside the rest of the

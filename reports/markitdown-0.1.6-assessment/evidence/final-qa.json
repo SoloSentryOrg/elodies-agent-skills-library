@@ -1,6 +1,6 @@
 {
-  "report": "reports/Microsoft_MarkItDown_MCP_VSCode_VisualStudio_v0.0.1a4_Assessment_2026-07-25_v1.0.docx",
-  "sha256": "a0f5ab51724078db82e1dcbe9ce0c0931e227806bbbba64d28d079c2a8415666",
+  "report": "reports/markitdown-0.1.6-assessment/Microsoft_MarkItDown_MCP_VSCode_VisualStudio_v0.0.1a4_Assessment_2026-07-25_v1.0.docx",
+  "sha256": "ce31eb34ab9327f092a385997456eaa693000f4dd0729d421fc9a091f8a3ef5d",
   "classification": "INTERNAL-CONFIDENTIAL",
   "decision": "Do not approve for production",
   "structural_validation": {

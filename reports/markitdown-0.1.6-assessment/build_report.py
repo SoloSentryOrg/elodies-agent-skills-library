@@ -18,7 +18,7 @@ from PIL import Image, ImageDraw, ImageFont
 
 ROOT = Path(__file__).resolve().parent
 STAGES = ROOT / "stages"
-OUT = ROOT.parent / "Microsoft_MarkItDown_MCP_VSCode_VisualStudio_v0.0.1a4_Assessment_2026-07-25_v1.0.docx"
+OUT = ROOT / "Microsoft_MarkItDown_MCP_VSCode_VisualStudio_v0.0.1a4_Assessment_2026-07-25_v1.0.docx"
 FIG = ROOT / "evidence" / "markitdown-trust-boundaries.png"
 BLUE, TEAL, LIGHT, PALE, RED = "17365D", "0F6B78", "D9EAF0", "EEF4F7", "C00000"
 

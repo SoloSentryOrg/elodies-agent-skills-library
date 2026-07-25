@@ -53,6 +53,20 @@ if reports_root.directory?
     relative = path.relative_path_from(ROOT).to_s
     errors << "unsupported report artifact: #{relative}" unless report_extensions.include?(path.extname.downcase)
   end
+
+  reports_root.children.each do |path|
+    if path.file?
+      next if path.basename.to_s == "README.md"
+
+      errors << "report artifact must be stored in an assessment directory: #{path.relative_path_from(ROOT)}"
+      next
+    end
+
+    next unless path.directory?
+
+    reports = path.children.select { |child| child.file? && child.extname.downcase == ".docx" }
+    errors << "assessment directory has no DOCX report: #{path.relative_path_from(ROOT)}" if reports.empty?
+  end
 end
 
 skill_roots = ROOT.children.select do |path|
