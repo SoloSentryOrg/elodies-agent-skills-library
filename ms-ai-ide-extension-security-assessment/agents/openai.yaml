@@ -1,4 +1,4 @@
 interface:
   display_name: "MS-AI-IDE-Extension-Security-Assessment"
-  short_description: "Assess AI extensions across Microsoft IDEs"
-  default_prompt: "Use $ms-ai-ide-extension-security-assessment to assess an AI-related Visual Studio or VS Code extension and produce a professional Word report."
+  short_description: "Produce evidence-led Microsoft IDE assessments"
+  default_prompt: "Use $ms-ai-ide-extension-security-assessment with default static, malware, and isolated runtime analysis to produce a fully validated authoritative Word assessment."

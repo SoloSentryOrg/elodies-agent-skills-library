@@ -2,6 +2,8 @@
 
 Use professional tone, numbered headings, table of contents, revision history, document control/classification, glossary, numbered figures/tables, page numbers, and consistent captions. Use the detailed report as the source of truth for all derivatives.
 
+Do not compress this structure into an executive brief. A section may be concise only when it is explicitly `Not applicable`, `Not observed`, `Unknown`, or out of scope with an evidence-backed rationale. Every authoritative report must satisfy [authoritative-report-standard.md](authoritative-report-standard.md).
+
 ## Front matter and shared overview
 
 1. Executive Summary
@@ -72,3 +74,7 @@ This part may hold the full common analysis, but it does not replace the complet
 - Use separate citations for distinct claims; include pinpoint section/page/version where available.
 - Test every internal and external hyperlink during QA.
 - Inspect the final DOCX package XML to confirm every in-text `REF-nnn` hyperlink targets an existing bookmark and every reference entry has the expected external relationship. Treat broken or duplicate bookmark targets as a shipping failure.
+
+## Finding-detail minimum
+
+For every finding, include its ID, title, affected IDE/version/component, threat scenario, asset, attacker or precondition, evidence IDs, inherent likelihood and impact, inherent score/rating, existing controls, control-strength rationale, residual likelihood and impact, residual score/rating, remediation, priority, owner, target date or time-bound milestone, verification test, framework mappings, and confidence. A compact consolidated risk table does not replace these finding records.

@@ -22,8 +22,9 @@ Ask only fields not already answered. Clarification is permitted before assessme
 
 ## Analysis choices
 
-- Runtime/dynamic analysis: **No (default) / Yes**
-- Malware-focused review: No/Yes
+- Static package/source/code analysis: **Yes (default) / No**
+- Malware-focused review and static scanning: **Yes (default) / No**
+- Runtime/dynamic analysis: **Yes (default) / No**
 - Privacy/data-protection assessment: Yes by default unless excluded
 - Need binary reverse engineering or only package/static inspection
 - Required framework or internal-policy additions
@@ -34,5 +35,7 @@ Ask only fields not already answered. Clarification is permitted before assessme
 
 - Use the latest stable version when no version is supplied, state the retrieval date, and preserve the package hash.
 - Assess both IDEs only when requested or when the listing claims support for both.
-- Assume no authorization for execution, installation, authentication, production access, or submission of sensitive information.
+- Treat the three Yes defaults as standing authorization for non-destructive static analysis, static malware scanning, and isolated runtime observation using synthetic data. Require a disposable, revertible, least-privilege environment before installation or execution.
+- Never infer authorization for production access, real credentials, customer data, destructive testing, persistence, credential access, lateral movement, detonation, or unrestricted external callbacks.
+- If a safe runtime environment is unavailable, do not silently change runtime analysis to No. Record the selected Yes state, the blocked capability, the evidence not collected, and the resulting approval constraint.
 - Mark unanswered material fields as assumptions or limitations.
