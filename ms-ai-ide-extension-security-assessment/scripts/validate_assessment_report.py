@@ -246,20 +246,32 @@ def _metadata_is_generic(value: str) -> bool:
 
 def validate_report(path: Path) -> ValidationResult:
     failures: list[str] = []
-    if path.suffix.casefold() != ".docx" or not path.is_file():
+    if path.suffix.casefold() != ".docx":
         return ValidationResult(str(path), False, None, ("input must be an existing .docx file",))
-    if path.is_symlink():
-        return ValidationResult(str(path), False, None, ("DOCX symlinks are prohibited",))
-    if path.stat().st_size > MAX_PACKAGE_BYTES:
-        return ValidationResult(
-            str(path),
-            False,
-            None,
-            (f"DOCX package exceeds {MAX_PACKAGE_BYTES} bytes",),
-        )
 
-    digest = _sha256(path)
     try:
+        if not path.is_file():
+            return ValidationResult(
+                str(path),
+                False,
+                None,
+                ("input must be an existing .docx file",),
+            )
+        if path.is_symlink():
+            return ValidationResult(
+                str(path),
+                False,
+                None,
+                ("DOCX symlinks are prohibited",),
+            )
+        if path.stat().st_size > MAX_PACKAGE_BYTES:
+            return ValidationResult(
+                str(path),
+                False,
+                None,
+                (f"DOCX package exceeds {MAX_PACKAGE_BYTES} bytes",),
+            )
+        digest = _sha256(path)
         with zipfile.ZipFile(path) as package:
             bounds_failures = _validate_package_bounds(path, package)
             if bounds_failures:
@@ -401,8 +413,17 @@ def validate_report(path: Path) -> ValidationResult:
             if not _metadata_is_generic(last_modified_by):
                 failures.append("lastModifiedBy metadata must be blank or a generic assessment identity")
 
-    except (zipfile.BadZipFile, InvalidDocumentError) as exc:
-        return ValidationResult(str(path), False, None, (str(exc),))
+    except (
+        EOFError,
+        OSError,
+        RuntimeError,
+        NotImplementedError,
+        zipfile.BadZipFile,
+        zipfile.LargeZipFile,
+        InvalidDocumentError,
+    ) as exc:
+        message = str(exc).strip() or type(exc).__name__
+        return ValidationResult(str(path), False, None, (message,))
 
     return ValidationResult(str(path), not failures, metrics, tuple(sorted(set(failures))))
 

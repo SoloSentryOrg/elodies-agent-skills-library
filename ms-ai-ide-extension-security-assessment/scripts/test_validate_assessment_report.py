@@ -74,6 +74,35 @@ class AssessmentReportValidatorTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("symlinks", result.failures[0])
 
+    def test_hash_io_failure_returns_structured_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "unreadable.docx")
+            path.write_bytes(b"not a zip")
+            with mock.patch.object(
+                MODULE,
+                "_sha256",
+                side_effect=PermissionError("hash read denied"),
+            ):
+                result = MODULE.validate_report(path)
+        self.assertFalse(result.passed)
+        self.assertIsNone(result.metrics)
+        self.assertEqual(result.failures, ("hash read denied",))
+
+    def test_zip_runtime_failure_returns_structured_failure(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "encrypted.docx")
+            with zipfile.ZipFile(path, "w") as package:
+                package.writestr("word/document.xml", "<document/>")
+            with mock.patch.object(
+                MODULE,
+                "_read_xml",
+                side_effect=RuntimeError("encrypted entry"),
+            ):
+                result = MODULE.validate_report(path)
+        self.assertFalse(result.passed)
+        self.assertIsNone(result.metrics)
+        self.assertEqual(result.failures, ("encrypted entry",))
+
 
 if __name__ == "__main__":
     unittest.main()
