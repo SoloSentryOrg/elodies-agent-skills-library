@@ -51,9 +51,10 @@ Browser automation, OCR/vision, RAG, and parallel agents are optional. Use them
 only when dynamic pages, image-only evidence, large evidence sets, or separately
 scoped reviews justify them.
 
-## Static package and source inspection
+## Default static package and source inspection
 
-No installed IDE is required for the default static assessment. Provide tools
+Static analysis is selected by default. No installed IDE is required for the
+static branch. Provide tools
 that can safely inspect the formats present in the extension, such as:
 
 - Git and HTTPS download tooling, commonly `git`, `curl`, or `wget`;
@@ -70,10 +71,11 @@ that can safely inspect the formats present in the extension, such as:
 Do not run package lifecycle hooks, macros, installers, extension activation,
 downloaded binaries, or third-party skill scripts during static analysis.
 
-## Conditional malware-review tools
+## Default malware-review tools
 
-Require this section only when intake authorizes malware review. Keep the work
-static unless runtime analysis is separately authorized.
+Malware review is selected by default. Keep malware triage static unless the
+runtime branch is safe and applicable; runtime authorization does not itself
+authorize detonation.
 
 - SHA-256, size, signature, certificate-chain, file-type, strings/imports, and
   archive-anomaly inspection.
@@ -88,9 +90,9 @@ static unless runtime analysis is separately authorized.
 Do not upload proprietary artefacts to public reputation or scanning services
 without authorization. A clean scan is evidence, not proof of safety.
 
-## Conditional runtime-analysis environment
+## Default runtime-analysis environment
 
-Require this section only when intake explicitly authorizes runtime analysis:
+Runtime analysis is selected by default. Require:
 
 - a disposable, revertible VM or isolated endpoint matching every OS and IDE
   version in the runtime scope;
@@ -140,10 +142,11 @@ Before assessment, confirm or explicitly record assumptions for:
   available and authorized.
 - `Partially ready`: static assessment can proceed, but named gaps limit a
   conditional branch, platform, evidence source, or derivative.
-- `Blocked`: a baseline capability is missing, or the requested runtime branch
-  lacks authorization, isolation, representative platform coverage, or safe
+- `Blocked`: a baseline capability is missing, or the selected runtime branch
+  lacks isolation, representative platform coverage, or safe
   evidence handling.
 
-Do not silently reduce scope to obtain `Ready`. State every missing capability,
-its effect on confidence or coverage, and the host verification needed to close
-the gap.
+Do not silently reduce scope or change a default Yes to No to obtain `Ready`.
+State every missing capability, its effect on confidence or coverage, and the
+host verification needed to close the gap. Use `Defer pending evidence` for an
+affected approval decision when the missing runtime evidence is material.
