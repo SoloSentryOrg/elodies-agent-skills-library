@@ -2,7 +2,7 @@
 
 Generate derivatives only from the versioned authoritative detailed assessment. Identify that source in every derivative and preserve finding IDs, scores, citations, limitations, and approval scope.
 
-- **PowerPoint:** invoke the available presentation workflow; focus on decision, top five outcomes, architecture/data flow, key risks, controls roadmap, and approval. Render and inspect slides.
+- **PowerPoint:** invoke the available presentation workflow and follow [office-artifact-workflow.md](office-artifact-workflow.md); use JavaScript with `@oai/artifact-tool`, never `python-pptx`. Focus on decision, top five outcomes, architecture/data flow, key risks, controls roadmap, and approval. Add source blocks to speaker notes, render every slide, run overflow/overlap checks, and inspect the result in Microsoft PowerPoint.
 - **Excel risk register:** invoke the spreadsheet workflow. Minimum columns: finding ID, IDE/version/component, title, scenario, evidence IDs, likelihood, impact, inherent score/rating, controls, control strength, residual likelihood, residual impact, residual score/rating, recommendation, owner, priority, target date, status, verification test, mappings, confidence.
 - **Diagrams:** use the available visualization/presentation workflow. Label actors, components, data stores, trust boundaries, protocols, data classes, privileges, and evidence/assumption status. Include accessible text descriptions.
 - **Markdown:** preserve numbered headings, tables, evidence IDs, external links, decision, scope, and limitations. Replace Word bookmark links with stable Markdown anchors.
