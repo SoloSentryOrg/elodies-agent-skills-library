@@ -26,10 +26,13 @@ These capabilities are required for every assessment:
   page-image rendering, and visual inspection. The document workflow must also
   support bookmarks, internal and external hyperlinks, accessibility checks,
   and metadata/privacy QA.
-- Access to the current bundled Word/document artifact workflow. When a PPTX is
-  requested, also require the current presentation workflow and its bundled
-  `@oai/artifact-tool` runtime. Use repository validators in addition to these
-  authoring workflows; neither substitutes for the other.
+- Prefer access to the current host Word/document artifact workflow. When it is
+  unavailable, use the portable deterministic helpers described in
+  [portable-execution.md](portable-execution.md) and record the missing host
+  capability. When a PPTX is requested, prefer the current presentation workflow
+  and its bundled `@oai/artifact-tool` runtime; the portable slide helper remains
+  capability-gated when that host runtime is absent. Use deterministic validators
+  in addition to authoring workflows; neither substitutes for the other.
 
 RAG or a vector database is not required. Retrieval, provenance tracking, and
 claim-to-source citation are required; ordinary web and filesystem retrieval

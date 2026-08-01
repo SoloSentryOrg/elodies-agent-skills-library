@@ -1,6 +1,6 @@
 {
   "source": "SoloSentryOrg/github-enterprise-management-solosentry:docs/lessons-learned/register.json",
-  "reviewed_at": "2026-07-13",
+  "reviewed_at": "2026-08-01",
   "allowed_lesson_ids": [
     "LL-0001",
     "LL-0002",
@@ -11,6 +11,7 @@
     "LL-0007",
     "LL-0008",
     "LL-0009",
-    "LL-0010"
+    "LL-0010",
+    "LL-0011"
   ]
 }

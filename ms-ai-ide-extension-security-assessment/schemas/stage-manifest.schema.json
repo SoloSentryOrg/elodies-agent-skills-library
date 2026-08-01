@@ -1,0 +1,41 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.example.invalid/ms-ai-ide-extension-security-assessment/stage-manifest-v1.json",
+  "title": "Assessment stage manifest",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "assessment", "target", "version", "run_key", "status", "stages", "claims", "report_model"],
+  "properties": {
+    "schema_version": {"const": 1},
+    "assessment": {"type": "string", "minLength": 1, "maxLength": 512},
+    "target": {"type": "string", "minLength": 1, "maxLength": 512},
+    "version": {"type": "string", "minLength": 1, "maxLength": 128},
+    "run_key": {"type": "string", "pattern": "^\\d{4}-\\d{2}-\\d{2}-v\\d+\\.\\d+$"},
+    "status": {"enum": ["Incomplete", "Validated"]},
+    "stages": {"type": "array", "minItems": 15, "maxItems": 15, "items": {"$ref": "#/$defs/stage"}},
+    "claims": {"$ref": "#/$defs/binding"},
+    "report_model": {"$ref": "#/$defs/binding"}
+  },
+  "$defs": {
+    "binding": {
+      "type": "object", "additionalProperties": false,
+      "required": ["file", "status", "sha256"],
+      "properties": {
+        "file": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "status": {"enum": ["Incomplete", "Validated"]},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    },
+    "stage": {
+      "type": "object", "additionalProperties": false,
+      "required": ["stage", "name", "file", "status", "sha256"],
+      "properties": {
+        "stage": {"type": "integer", "minimum": 1, "maximum": 15},
+        "name": {"type": "string", "pattern": "^[a-z0-9-]+$"},
+        "file": {"type": "string", "pattern": "^[A-Za-z0-9][A-Za-z0-9._-]*$"},
+        "status": {"enum": ["Incomplete", "Validated"]},
+        "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"}
+      }
+    }
+  }
+}

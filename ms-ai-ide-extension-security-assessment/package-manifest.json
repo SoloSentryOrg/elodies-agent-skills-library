@@ -1,0 +1,296 @@
+{
+  "files": [
+    {
+      "path": "agents/openai.yaml",
+      "sha256": "28ab31bfad22f67771b989200b4c8384231f7a1f9ef8aa3d3a08b8f00807f5f9",
+      "size": 380
+    },
+    {
+      "path": "pptx-runtime-acceptance.json",
+      "sha256": "649930f23e5f6332656b74e1c5c93f2c65c76e0803dde1d00bf1856827693f19",
+      "size": 1325
+    },
+    {
+      "path": "references/authoritative-report-standard.md",
+      "sha256": "07fb1b182db81a6fba33a6802b7001ea9e5930fe03dcca9163d2e318a775528b",
+      "size": 2758
+    },
+    {
+      "path": "references/derivatives.md",
+      "sha256": "428218cc9de21ce0d0d20a36036c581799ff04dc585f7252a866e2ab36660ac7",
+      "size": 2096
+    },
+    {
+      "path": "references/evidence-and-research.md",
+      "sha256": "cfd41fa21863fc5bf01e3b08eef4c83d7db656e49df1d6f6e59f8efe1f1e2612",
+      "size": 3020
+    },
+    {
+      "path": "references/frameworks.md",
+      "sha256": "f6fb74a563e6ad528adb67793c022b977e04230ea167e5f484b1d2a9e291a162",
+      "size": 4827
+    },
+    {
+      "path": "references/intake.md",
+      "sha256": "9bf5568975a338b4c2067bab4308e4940e21eb04c72fd51ff294e4fb0ae5dfe3",
+      "size": 2612
+    },
+    {
+      "path": "references/malware-review.md",
+      "sha256": "70d71399f230c162b7a3e29e4944c988939a4ddc50d650c317cfc0e1d41e4b8c",
+      "size": 1783
+    },
+    {
+      "path": "references/office-artifact-workflow.md",
+      "sha256": "a888c1f8356a5b617a31bf95b58432170e804e8a2737208284c75243caf867e6",
+      "size": 4818
+    },
+    {
+      "path": "references/portable-execution.md",
+      "sha256": "541391bcf0aad3ccb6a2c1d558c868049a34a36d6664f3827fe3a5b5f16b0105",
+      "size": 7225
+    },
+    {
+      "path": "references/prerequisites.md",
+      "sha256": "f8c4e8b74d8edfcca138d37cf51e06cad49241cf4a52480942e24bf614f6be97",
+      "size": 8529
+    },
+    {
+      "path": "references/quality-gates.md",
+      "sha256": "ceb7e1e352299c830ba5d8cec347a1679d7344bd0714c0042fe576f1b6199e11",
+      "size": 5711
+    },
+    {
+      "path": "references/report-structure.md",
+      "sha256": "f0f1e53a414e544e5a447ec67d4b0b632c11d67ea9ae9ef2a98e678e488c1d7b",
+      "size": 4698
+    },
+    {
+      "path": "references/scoring.md",
+      "sha256": "a9a8d56f343532fb8b4ac0c1898175286481642a79344cce0315cf6d49c46688",
+      "size": 3247
+    },
+    {
+      "path": "references/skill-assessment.md",
+      "sha256": "4b908ee5318174a34412ac6fe5caa862fa3a0299770c0886ece8c8f022f280e5",
+      "size": 2077
+    },
+    {
+      "path": "references/stage-output-contract.md",
+      "sha256": "a41e81d7839232c9c38861890bf37cf8a07e9cfe26d75a2d91145577aaf004e5",
+      "size": 2071
+    },
+    {
+      "path": "schemas/report-model.schema.json",
+      "sha256": "a2233477555e17197e4e012be692b914d4197f98879e8359b01e455cee56e9bb",
+      "size": 9493
+    },
+    {
+      "path": "schemas/stage-manifest.schema.json",
+      "sha256": "a699afc431503cb31544617adb4b6511acb051cc86b5af11ba2af79855950de0",
+      "size": 1868
+    },
+    {
+      "path": "schemas/validated-claims.schema.json",
+      "sha256": "415fb4d28b9cb49b5bb6a36c65ba89b77d7a473de13f93a9238bafa27607c606",
+      "size": 1747
+    },
+    {
+      "path": "scripts/allowed-docx-custom-xml.json",
+      "sha256": "a7da8940ae48880408f8aea858caabe1301938e2546df4451093990448b3577b",
+      "size": 430
+    },
+    {
+      "path": "scripts/build_assessment_docx.py",
+      "sha256": "a642e223790dcc6f8394923acd821e4cd6710db3d4c929f0886fa0eb5a20d1f4",
+      "size": 56900
+    },
+    {
+      "path": "scripts/build_assessment_pptx.mjs",
+      "sha256": "ad81b46b544f24c043334d0e10f4dc96b2637a8c707a38958292a045d6a8a338",
+      "size": 68717
+    },
+    {
+      "path": "scripts/build_release_archive.py",
+      "sha256": "3e8e1f0e5e79d8923ecc37c8ebebaaa1df7c30e275914a948a27488da5534bfe",
+      "size": 2380
+    },
+    {
+      "path": "scripts/build_release_manifest.py",
+      "sha256": "506ebd1ae59c805f21e33678f53c8c496f86307a466377c207de86b0c3668a8f",
+      "size": 9800
+    },
+    {
+      "path": "scripts/create_artifact_runtime_receipt.mjs",
+      "sha256": "1e7ab9c331d55bf05a08ac64d7df5d3ad047e0f219a4e6f3d299e6f15f79530d",
+      "size": 7875
+    },
+    {
+      "path": "scripts/create_pptx_montage.py",
+      "sha256": "59eaf27a4699fc75e75fd5846d672775b000ef9889da62ede51f1f0fa9697677",
+      "size": 2633
+    },
+    {
+      "path": "scripts/create_word_qa_contact_sheets.py",
+      "sha256": "16aac81fdc9768bf74b4f34f86b3810125439affd0e3f9e854c8bbd20a9f9831",
+      "size": 6711
+    },
+    {
+      "path": "scripts/finalize_office_qa.py",
+      "sha256": "62aced25d9a91236b114a9593bc90280a22024c014bf2419044377343a9f17d8",
+      "size": 6368
+    },
+    {
+      "path": "scripts/initialize_stage_bundle.py",
+      "sha256": "9c72764feb2cbba7051311d0e709885dd694adf3663ba8a9e900a54a7f545f7a",
+      "size": 7575
+    },
+    {
+      "path": "scripts/inspect_vsix.py",
+      "sha256": "dafbdd21e98f0d5937416c536f612e9cf5dd18398590901aca44c76068ee22c8",
+      "size": 19744
+    },
+    {
+      "path": "scripts/portable_fs.py",
+      "sha256": "c4664cde1e52b0de9e7dc46413bc305270acd0f4be1a7b98e0a0f004c21835e7",
+      "size": 10481
+    },
+    {
+      "path": "scripts/render_presentations_with_powerpoint.applescript",
+      "sha256": "c74c2e0ba45e3ce822e30234a47ad75c2788248b2d92de7fc01519e4a40d67f8",
+      "size": 9210
+    },
+    {
+      "path": "scripts/render_presentations_with_powerpoint.ps1",
+      "sha256": "c625537e3a187d91245e433b768d446ea4422a58f90ddb0ae87c0a4dadb3a2b8",
+      "size": 2723
+    },
+    {
+      "path": "scripts/render_reports_with_word.applescript",
+      "sha256": "51dbd904faa0710de431ad5c76410d87d55e2e21504dc2dfea47f59eabe5a2c2",
+      "size": 9249
+    },
+    {
+      "path": "scripts/render_reports_with_word.ps1",
+      "sha256": "b39cae88df79a00b93c8a81df9f936b7bc35c33bfc5fc068d7a2463a5839aefd",
+      "size": 2666
+    },
+    {
+      "path": "scripts/requirements.in",
+      "sha256": "9a1943631d9d51e0ba6f508f25f3600bb0c9f563de30e4f5450f00c8748d4168",
+      "size": 177
+    },
+    {
+      "path": "scripts/requirements.lock",
+      "sha256": "c5caf205040cf99d8fbb84673a00be227d0837b9e3e3b5dd8845afebda525473",
+      "size": 31062
+    },
+    {
+      "path": "scripts/runtime-requirements.json",
+      "sha256": "9b45640fa7fb1185ec790e3630d461613ab8a7b61793b2c0e7ed22b23b37f81c",
+      "size": 1008
+    },
+    {
+      "path": "scripts/safe_stage_inputs.py",
+      "sha256": "05d8ecd92653812543005ac707b0f9d89172b4387df52c109c1b1898ec4d902e",
+      "size": 12671
+    },
+    {
+      "path": "scripts/secure_pptx_stage_bundle.py",
+      "sha256": "f0d3cb215e4c859fdcdd17402c88aa8b6c8aa559d3b5c3f99a3c8e477b7cf328",
+      "size": 9281
+    },
+    {
+      "path": "scripts/stage_office_artifact.py",
+      "sha256": "7899a5b8bf8a9d1afec2b3037cb8051ebcc72b97c4c6207f4265d768918c2eaf",
+      "size": 5933
+    },
+    {
+      "path": "scripts/sync_skill_installations.py",
+      "sha256": "5b04740f3bd92f71c295e631b77217c8733b2ac3136e20f46238f1a54814bc8a",
+      "size": 7784
+    },
+    {
+      "path": "scripts/test_build_assessment_docx.py",
+      "sha256": "e037f1bc80f5547ba007374cdeef7d7831792d89c45aa6549f80beecdfb096ed",
+      "size": 19405
+    },
+    {
+      "path": "scripts/test_build_assessment_pptx.py",
+      "sha256": "1602a3805edc4ec53b0099bd217d7ebcd12c56e1dd66920a1c71f32377b64d49",
+      "size": 33045
+    },
+    {
+      "path": "scripts/test_create_word_qa_contact_sheets.py",
+      "sha256": "e1b9c02888c08d8242a368402ac447c08f2d68b4644ca7167b11034af0bf788d",
+      "size": 2431
+    },
+    {
+      "path": "scripts/test_inspect_vsix.py",
+      "sha256": "2630b69838c18742dec17fba6b93727df317b31e7ba1e2968e8cd97ce926cef8",
+      "size": 13789
+    },
+    {
+      "path": "scripts/test_portable_fs.py",
+      "sha256": "0f9a104cedb0efb37d35fc359419144352c5cb8ce68e8df0c98eefecd5304f28",
+      "size": 7525
+    },
+    {
+      "path": "scripts/test_portable_package.py",
+      "sha256": "f4b15e10f6630a8158a643c5bb3b0b5ae3512c63103494a281a7ceff407eebc3",
+      "size": 6051
+    },
+    {
+      "path": "scripts/test_portable_security_contracts.py",
+      "sha256": "27f85fe74add96bf9c3b3e8c44e127245ab74712224648cd8491e197593666df",
+      "size": 10995
+    },
+    {
+      "path": "scripts/test_validate_assessment_layout.py",
+      "sha256": "2acfc74c2a715fa936b0202401e4dfca72f52016b1c45ce26f5c6241efdbdfdb",
+      "size": 12921
+    },
+    {
+      "path": "scripts/test_validate_assessment_report.py",
+      "sha256": "7e22802ca226a8a7927d6941adfea3dffbc23bdcb7d9d0664dc186e6d25fced0",
+      "size": 12078
+    },
+    {
+      "path": "scripts/validate_assessment_layout.py",
+      "sha256": "d4f32fffc7fa3e414b7dded4281157289dd11b4703366e55161e71e7bf5592a6",
+      "size": 19056
+    },
+    {
+      "path": "scripts/validate_assessment_pptx.py",
+      "sha256": "8a641e268ee011954143d4991549076b7c32a795773cf62b9546fa8c5f23289c",
+      "size": 8460
+    },
+    {
+      "path": "scripts/validate_assessment_report.py",
+      "sha256": "aea30e3edd04faebcef0cd953399b5973fdd0c6945cc0d26eb8d81b2a8d3b72b",
+      "size": 26847
+    },
+    {
+      "path": "scripts/validate_pptx_runtime_acceptance.py",
+      "sha256": "24f20b85d7c6d82fd655549c302d258d5350c9528dbdd6587ea218fb615da657",
+      "size": 2829
+    },
+    {
+      "path": "scripts/validate_skill_package.py",
+      "sha256": "e2a3653a1043132b659ca328c0ce66f672a62088838233edf1c045a29dcef5b2",
+      "size": 8773
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "f54b132698f8d20eaf07c8bbf9086dda272a4f7942c87fb35d66703133f24400",
+      "size": 12683
+    }
+  ],
+  "schema_version": 1,
+  "skill": "ms-ai-ide-extension-security-assessment",
+  "source": {
+    "ref": "ms-ai-ide-extension-security-assessment-v1.4.0",
+    "repository": "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
+  },
+  "version": "1.4.0"
+}
