@@ -752,21 +752,55 @@ function addArchitectureSlides(presentation, model, number) {
     const b = positions.get(target);
     const spansIntermediateNode = a.row === b.row && Math.abs(a.column - b.column) > 1;
     const routeSide = a.row < rowCount / 2 ? "top" : "bottom";
-    slide.shapes.connect(nodeShapes.get(source), nodeShapes.get(target), {
-      kind: spansIntermediateNode ? "elbow" : "straight",
-      ...(spansIntermediateNode ? { fromSide: routeSide, toSide: routeSide } : {}),
-      line: { style: "solid", fill: "#8A929A", width: 2 },
-      tail: { type: "arrow", width: "sm", length: "sm" },
-    });
     const ax = a.left + a.width / 2;
     const ay = a.top + a.height / 2;
     const bx = b.left + b.width / 2;
     const by = b.top + b.height / 2;
-    const labelTop = spansIntermediateNode
-      ? (routeSide === "top"
-          ? Math.min(a.top, b.top) - 50
-          : Math.max(a.top + a.height, b.top + b.height) + 12)
-      : (ay + by) / 2 - 28;
+    let labelTop = (ay + by) / 2 - 28;
+    if (spansIntermediateNode) {
+      // PowerPoint can detach same-side elbow arrowheads after native import.
+      // Use editable passive shapes for a deterministic outside-node route.
+      const sourceY = routeSide === "top" ? a.top : a.top + a.height;
+      const targetY = routeSide === "top" ? b.top : b.top + b.height;
+      const routeY = routeSide === "top"
+        ? Math.min(a.top, b.top) - 59
+        : Math.max(a.top + a.height, b.top + b.height) + 53;
+      const routeColor = "#8A929A";
+      const addRouteSegment = (name, position) => {
+        const segment = slide.shapes.add({
+          geometry: "rect",
+          name,
+          position,
+          fill: routeColor,
+          line: { style: "solid", fill: "none", width: 0 },
+        });
+        segment.sendToBack();
+      };
+      addRouteSegment(`architecture-spanning-edge-${index}-source`, { left: ax - 1, top: Math.min(sourceY, routeY), width: 2, height: Math.abs(sourceY - routeY) });
+      addRouteSegment(`architecture-spanning-edge-${index}-route`, { left: Math.min(ax, bx), top: routeY - 1, width: Math.abs(ax - bx), height: 2 });
+      addRouteSegment(`architecture-spanning-edge-${index}-target`, { left: bx - 1, top: Math.min(targetY, routeY), width: 2, height: Math.abs(targetY - routeY) });
+      const arrow = slide.shapes.add({
+        geometry: "triangle",
+        name: `architecture-spanning-edge-${index}-arrow`,
+        position: {
+          left: bx - 6,
+          top: routeSide === "top" ? targetY - 10 : targetY,
+          width: 12,
+          height: 10,
+          rotation: routeSide === "top" ? 180 : 0,
+        },
+        fill: routeColor,
+        line: { style: "solid", fill: "none", width: 0 },
+      });
+      arrow.sendToBack();
+      labelTop = routeSide === "top" ? routeY + 6 : routeY - 46;
+    } else {
+      slide.shapes.connect(nodeShapes.get(source), nodeShapes.get(target), {
+        kind: "straight",
+        line: { style: "solid", fill: "#8A929A", width: 2 },
+        tail: { type: "arrow", width: "sm", length: "sm" },
+      });
+    }
     addText(slide, `architecture-edge-label-${index}`, String(index + 1).padStart(2, "0"), { left: (ax + bx) / 2 - 30, top: labelTop, width: 60, height: 38 }, 16, { alignment: "center", color: "#58616B", bold: true });
   });
   nodes.forEach((node, index) => {

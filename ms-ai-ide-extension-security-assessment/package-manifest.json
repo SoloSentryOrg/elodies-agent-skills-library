@@ -7,7 +7,7 @@
     },
     {
       "path": "pptx-runtime-acceptance.json",
-      "sha256": "e4bec10e216545d22bab36ea8ec25d919d7c33e3ba96777fdef021097df8f87a",
+      "sha256": "a663067d238a2ab2f1a6d247a2f715743f4ccfaf36373144e055f7c6a60b06ff",
       "size": 1324
     },
     {
@@ -102,13 +102,13 @@
     },
     {
       "path": "scripts/build_assessment_docx.py",
-      "sha256": "b0024d9c033211887c12a072de96d306e4e0e76a25c94695b60708d3d236a322",
+      "sha256": "4123bbe78431fffeeaa2429e1462d3fc667a8aabdf93ef60f1770bfd756b8618",
       "size": 56900
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "4ffbe8b342fc0edc272066c1595a0d18498baf408f25b361d0009e63f685e61f",
-      "size": 68866
+      "sha256": "191236a1146c1d847edf377fc4febafa8793ebb3cc092bff891751016ddb04e0",
+      "size": 70419
     },
     {
       "path": "scripts/build_release_archive.py",
@@ -217,8 +217,8 @@
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
-      "sha256": "cf3bba6b3ad44ce3925c5ad614f58927b854f05fe54abd88b36d9c06f19c22cb",
-      "size": 36475
+      "sha256": "bdc4c09fc28b5ff31bcbabae78dcdb81e34bd9df44802a8ce1170b6f4e534dc5",
+      "size": 36791
     },
     {
       "path": "scripts/test_create_word_qa_contact_sheets.py",
@@ -237,7 +237,7 @@
     },
     {
       "path": "scripts/test_portable_package.py",
-      "sha256": "9a0e1d9e43ddf0d1896f27bb940b4e84b3a8a2cf8e51eec0437a07dac9d4aa43",
+      "sha256": "461362a506c426a00badc3f0308cfad4ec8521b294694a2ada5f6987657e19fa",
       "size": 6051
     },
     {
@@ -277,20 +277,20 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "823f7dafbab9754920d6a747a284d6a6cc85c51908e3e44db8c73a21abd4d8eb",
+      "sha256": "21cca8f63c2f23e08a58fda39ff6ab3e19b6e00888a055a1a6b23b78ac5214e3",
       "size": 8773
     },
     {
       "path": "SKILL.md",
-      "sha256": "c18e21a61ff337ebfc31c41cf133b1dedbc4385f1063f8646474d60f3e7a13f2",
+      "sha256": "7e530843bf43b059ec0c5089670829ce286995d56440698f0745bbfa3934fed8",
       "size": 12683
     }
   ],
   "schema_version": 1,
   "skill": "ms-ai-ide-extension-security-assessment",
   "source": {
-    "ref": "ms-ai-ide-extension-security-assessment-v1.4.4",
+    "ref": "ms-ai-ide-extension-security-assessment-v1.4.5",
     "repository": "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
   },
-  "version": "1.4.4"
+  "version": "1.4.5"
 }
