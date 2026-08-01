@@ -119,37 +119,59 @@ class PortableFilesystemTests(unittest.TestCase):
             ):
                 require_real_directory(safe)
 
-    @unittest.skipUnless(os.name == "nt", "Windows post-open parent race semantics")
-    def test_windows_post_open_parent_swap_closes_and_deletes_by_handle(self) -> None:
+    @unittest.skipUnless(os.name == "nt", "Windows open-handle rename semantics")
+    def test_windows_open_output_blocks_parent_swap(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             safe = root / "safe"
             safe.mkdir()
             moved = root / "moved"
-            outside = root / "outside"
-            outside.mkdir()
-            real_open = portable_fs._windows_descriptor
+            output = safe / "output.bin"
+            descriptor = portable_fs._windows_descriptor(
+                output,
+                write=True,
+                create_new=True,
+            )
+            try:
+                with self.assertRaises(PermissionError):
+                    safe.rename(moved)
+            finally:
+                os.close(descriptor)
+                output.unlink()
+            self.assertTrue(safe.is_dir())
+            self.assertFalse(moved.exists())
 
-            def race_after_open(path: Path, *, write: bool, create_new: bool) -> int:
-                descriptor = real_open(path, write=write, create_new=create_new)
-                safe.rename(moved)
-                created = subprocess.run(
-                    ["cmd", "/d", "/c", "mklink", "/J", str(safe), str(outside)],
-                    text=True,
-                    capture_output=True,
-                    check=False,
-                )
-                self.assertEqual(created.returncode, 0, created.stderr or created.stdout)
-                return descriptor
+    @unittest.skipUnless(os.name == "nt", "Windows post-open cleanup semantics")
+    def test_windows_post_open_validation_deletes_by_handle(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            safe = root / "safe"
+            safe.mkdir()
+            output = safe / "output.bin"
+            real_validate = portable_fs.require_real_directory
+            validation_count = 0
+
+            def fail_post_open_validation(path: Path) -> Path:
+                nonlocal validation_count
+                validation_count += 1
+                if validation_count == 2:
+                    raise ValueError("simulated parent identity failure")
+                return real_validate(path)
 
             with (
-                mock.patch("portable_fs._windows_descriptor", side_effect=race_after_open),
-                self.assertRaisesRegex(ValueError, "reparse|junction|identity"),
+                mock.patch(
+                    "portable_fs.require_real_directory",
+                    side_effect=fail_post_open_validation,
+                ),
+                mock.patch(
+                    "portable_fs._windows_mark_descriptor_delete",
+                    wraps=portable_fs._windows_mark_descriptor_delete,
+                ) as delete_by_handle,
+                self.assertRaisesRegex(ValueError, "identity failure"),
             ):
-                open_exclusive_write(safe / "output.bin")
-            self.assertFalse((outside / "output.bin").exists())
-            self.assertFalse((moved / "output.bin").exists())
-            moved.rmdir()
+                open_exclusive_write(output)
+            delete_by_handle.assert_called_once()
+            self.assertFalse(output.exists())
 
 
 if __name__ == "__main__":
