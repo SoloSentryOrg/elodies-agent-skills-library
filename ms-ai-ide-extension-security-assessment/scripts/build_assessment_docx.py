@@ -1152,7 +1152,7 @@ def write_build_manifest(
         "schema_version": 1,
         "assessment": model["assessment"],
         "run_key": model["run_key"],
-        "parent_skill_version": "1.4.1",
+        "parent_skill_version": "1.4.2",
         "design_preset": "standard_business_brief",
         "header_pattern": "memo_masthead",
         "generated_at": datetime.now(UTC).isoformat(),

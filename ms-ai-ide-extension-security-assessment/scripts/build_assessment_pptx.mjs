@@ -580,7 +580,7 @@ function validateAuthoritativeWord(workspaceRoot, model, modelBinding, raw) {
     throw new ModelError("authoritative Word QA subrecord digest mismatch");
   }
   const word = record(qa.word, "authoritative Word QA word result");
-  if (qa.status !== "Passed" || qa.assessment !== model.target || qa.run_key !== model.run_key
+  if (qa.status !== "Passed" || qa.assessment !== model.assessment || qa.run_key !== model.run_key
     || word.result !== "Passed" || word.every_page_inspected !== true || word.contents_starts_on_fresh_page !== true
     || word.input_sha256 !== authoritative.docx_sha256 || word.input_file !== path.basename(docxPath)
     || !Number.isInteger(word.page_count) || word.page_count < 1) {
