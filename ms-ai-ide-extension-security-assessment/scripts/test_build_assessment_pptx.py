@@ -348,6 +348,31 @@ class AssessmentPptxTests(unittest.TestCase):
         self.assertEqual(summary["findings"], 2)
         self.assertEqual(summary["references"], 12)
 
+    def test_validate_only_accepts_detailed_ide_scope_label(self) -> None:
+        model = valid_model()
+        model["ide_scope"] = [
+            "Static platform scope: the platform-neutral package and all bundled native prebuilds; behavioural platform scope remains Blocked."
+        ]
+        self.write_model(model)
+
+        result = self.run_builder(
+            "--stage-root", str(self.stage_root), "--validate-only"
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_validate_only_rejects_ide_scope_over_160_bytes(self) -> None:
+        model = valid_model()
+        model["ide_scope"] = ["x" * 161]
+        self.write_model(model)
+
+        result = self.run_builder(
+            "--stage-root", str(self.stage_root), "--validate-only"
+        )
+
+        self.assertEqual(result.returncode, 2)
+        self.assertIn("ide_scope is oversized", result.stderr)
+
     def test_validate_only_rejects_stage_root_outside_workspace(self) -> None:
         self.write_model(valid_model())
         with tempfile.TemporaryDirectory() as directory:
