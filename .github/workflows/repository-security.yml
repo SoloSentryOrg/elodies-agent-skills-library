@@ -40,7 +40,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
           python3 ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py
-          --expected-version 1.4.2
+          --expected-version 1.4.3
 
       - name: Run portable skill regression tests
         env:
@@ -90,7 +90,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
           python ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py
-          --expected-version 1.4.2
+          --expected-version 1.4.3
 
       - name: Run portable regression tests on Windows
         env:
