@@ -724,6 +724,7 @@ function addArchitectureSlides(presentation, model, number) {
   addTitle(slide, model.figure.title, number, model);
   const nodes = model.figure.nodes;
   const columns = nodes.length <= 4 ? nodes.length : Math.ceil(nodes.length / 2);
+  const rowCount = Math.ceil(nodes.length / columns);
   const nodeWidth = 210;
   const horizontalGap = columns > 1 ? (1170 - columns * nodeWidth) / (columns - 1) : 0;
   const positions = new Map();
@@ -749,8 +750,11 @@ function addArchitectureSlides(presentation, model, number) {
   model.figure.edges.forEach(([source, target, label], index) => {
     const a = positions.get(source);
     const b = positions.get(target);
+    const spansIntermediateNode = a.row === b.row && Math.abs(a.column - b.column) > 1;
+    const routeSide = a.row < rowCount / 2 ? "top" : "bottom";
     slide.shapes.connect(nodeShapes.get(source), nodeShapes.get(target), {
-      kind: "straight",
+      kind: spansIntermediateNode ? "elbow" : "straight",
+      ...(spansIntermediateNode ? { fromSide: routeSide, toSide: routeSide } : {}),
       line: { style: "solid", fill: "#8A929A", width: 2 },
       tail: { type: "arrow", width: "sm", length: "sm" },
     });
@@ -758,7 +762,12 @@ function addArchitectureSlides(presentation, model, number) {
     const ay = a.top + a.height / 2;
     const bx = b.left + b.width / 2;
     const by = b.top + b.height / 2;
-    addText(slide, `architecture-edge-label-${index}`, String(index + 1).padStart(2, "0"), { left: (ax + bx) / 2 - 30, top: (ay + by) / 2 - 28, width: 60, height: 38 }, 16, { alignment: "center", color: "#58616B", bold: true });
+    const labelTop = spansIntermediateNode
+      ? (routeSide === "top"
+          ? Math.min(a.top, b.top) - 50
+          : Math.max(a.top + a.height, b.top + b.height) + 12)
+      : (ay + by) / 2 - 28;
+    addText(slide, `architecture-edge-label-${index}`, String(index + 1).padStart(2, "0"), { left: (ax + bx) / 2 - 30, top: labelTop, width: 60, height: 38 }, 16, { alignment: "center", color: "#58616B", bold: true });
   });
   nodes.forEach((node, index) => {
     const position = positions.get(node);
