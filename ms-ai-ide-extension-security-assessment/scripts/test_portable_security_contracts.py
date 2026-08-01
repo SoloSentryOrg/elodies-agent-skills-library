@@ -50,6 +50,22 @@ def _pptx(path: Path, *, forbidden: bool = False, active_relationship: bool = Fa
             )
 
 
+def _pptx_external_relationship(path: Path, target_mode: str) -> None:
+    with zipfile.ZipFile(path, "w", zipfile.ZIP_DEFLATED) as package:
+        package.writestr("[Content_Types].xml", "<Types/>")
+        package.writestr("ppt/presentation.xml", "<presentation/>")
+        package.writestr("ppt/slides/slide1.xml", "<slide/>")
+        package.writestr("ppt/notesSlides/notesSlide1.xml", "<notes/>")
+        package.writestr(
+            "ppt/slides/_rels/slide1.xml.rels",
+            '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+            '<Relationship Id="rId1" '
+            'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
+            f'Target="http://127.0.0.1/private" TargetMode="{target_mode}"/>'
+            "</Relationships>",
+        )
+
+
 class PortableSecurityContractTests(unittest.TestCase):
     def test_public_https_rejects_legacy_numeric_loopback(self) -> None:
         for target in ("https://2130706433/private", "https://0x7f000001/private", "https://017700000001/private"):
@@ -110,6 +126,20 @@ class PortableSecurityContractTests(unittest.TestCase):
             path = Path(directory) / "unsafe.pptx"
             _pptx(path, active_relationship=True)
             with self.assertRaisesRegex(PptxValidationError, "active relationship"):
+                validate_pptx(path)
+
+    def test_pptx_validator_normalizes_external_target_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "unsafe.pptx"
+            _pptx_external_relationship(path, " ExTeRnAl ")
+            with self.assertRaisesRegex(PptxValidationError, "external relationship"):
+                validate_pptx(path)
+
+    def test_pptx_validator_rejects_unknown_target_mode(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "unsafe.pptx"
+            _pptx_external_relationship(path, "Remote")
+            with self.assertRaisesRegex(PptxValidationError, "invalid TargetMode"):
                 validate_pptx(path)
 
     def test_office_stager_binds_digest_and_refuses_overwrite(self) -> None:

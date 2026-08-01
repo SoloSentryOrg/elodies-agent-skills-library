@@ -12,7 +12,6 @@ from pathlib import Path
 
 from build_release_manifest import _read_regular
 from validate_skill_package import MANIFEST_NAME, validate_package
-from portable_fs import bounded_read
 
 
 def create_archive(source: Path, output: Path) -> None:

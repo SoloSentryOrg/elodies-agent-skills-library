@@ -77,6 +77,27 @@ class AssessmentReportValidatorTests(unittest.TestCase):
             any("external non-hyperlink relationship" in failure for failure in result.failures)
         )
 
+    def test_external_target_mode_is_normalized_and_unknown_mode_rejected(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            for filename, target_mode, expected in (
+                ("normalized.docx", " ExTeRnAl ", "public HTTPS"),
+                ("unknown.docx", "Remote", "invalid TargetMode"),
+            ):
+                path = root / filename
+                with zipfile.ZipFile(path, "w") as package:
+                    package.writestr(
+                        "word/_rels/document.xml.rels",
+                        '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                        '<Relationship Id="rId1" '
+                        'Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/hyperlink" '
+                        f'Target="http://127.0.0.1/private" TargetMode="{target_mode}"/>'
+                        "</Relationships>",
+                    )
+                with zipfile.ZipFile(path) as package:
+                    failures = MODULE._validate_relationships(package)
+                self.assertTrue(any(expected in failure for failure in failures), failures)
+
     def test_embedded_active_part_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
             path = Path(directory, "active.docx")

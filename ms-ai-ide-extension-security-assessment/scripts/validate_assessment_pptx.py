@@ -7,10 +7,8 @@ from __future__ import annotations
 import argparse
 import ipaddress
 import io
-import os
 import re
 import socket
-import stat
 import sys
 import zipfile
 from pathlib import Path, PurePosixPath
@@ -132,13 +130,22 @@ def validate_pptx_bytes(data: bytes) -> dict[str, int]:
             if str(member).endswith(".rels"):
                 root = _xml(package.read(entry), str(member))
                 for relationship in root.findall(REL_TAG):
-                    target_mode = relationship.attrib.get("TargetMode", "")
+                    target_mode_raw = relationship.attrib.get("TargetMode", "")
+                    target_mode = target_mode_raw.strip().casefold()
                     target = relationship.attrib.get("Target", "")
                     rel_type = relationship.attrib.get("Type", "")
-                    if any(rel_type.endswith(suffix) for suffix in FORBIDDEN_RELATIONSHIP_SUFFIXES):
+                    rel_type_normalized = rel_type.casefold()
+                    if any(
+                        rel_type_normalized.endswith(suffix.casefold())
+                        for suffix in FORBIDDEN_RELATIONSHIP_SUFFIXES
+                    ):
                         raise PptxValidationError(f"PPTX contains a prohibited active relationship: {rel_type}")
-                    if target_mode == "External":
-                        if not rel_type.endswith("/hyperlink") or not _public_https(target):
+                    if target_mode not in {"", "internal", "external"}:
+                        raise PptxValidationError(
+                            f"PPTX relationship has invalid TargetMode: {target_mode_raw!r}"
+                        )
+                    if target_mode == "external":
+                        if not rel_type_normalized.endswith("/hyperlink") or not _public_https(target):
                             raise PptxValidationError(f"PPTX contains a prohibited external relationship: {target}")
         required = {"[Content_Types].xml", "ppt/presentation.xml"}
         if not required.issubset(set(names)) or slides < 1:

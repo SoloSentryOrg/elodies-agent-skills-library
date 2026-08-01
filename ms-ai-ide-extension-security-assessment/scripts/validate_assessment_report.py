@@ -8,10 +8,8 @@ import hashlib
 import io
 import ipaddress
 import json
-import os
 import re
 import socket
-import stat
 import sys
 import zipfile
 from dataclasses import asdict, dataclass
@@ -262,10 +260,17 @@ def _validate_relationships(package: zipfile.ZipFile) -> list[str]:
                 failures.append(
                     f"active or embedded relationship is prohibited: {name}"
                 )
-            if relation.get("TargetMode") != "External":
+            target_mode = relation.get("TargetMode", "").strip().casefold()
+            if target_mode not in {"", "internal", "external"}:
+                failures.append(
+                    f"relationship has invalid TargetMode: {name}: "
+                    f"{relation.get('TargetMode', '')!r}"
+                )
+                continue
+            if target_mode != "external":
                 continue
             target = relation.get("Target", "")
-            if not relation_type.endswith("/hyperlink"):
+            if not relation_type.casefold().endswith("/hyperlink"):
                 failures.append(f"external non-hyperlink relationship is prohibited: {name}")
             elif not _external_target_is_safe(target):
                 failures.append(f"external hyperlink target must be public HTTPS: {target}")
