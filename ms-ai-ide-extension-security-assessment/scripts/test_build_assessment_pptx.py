@@ -555,12 +555,22 @@ class AssessmentPptxTests(unittest.TestCase):
     @unittest.skipUnless(shutil.which("node") and SETUP.is_file(), "bundled artifact runtime unavailable")
     def test_builds_editable_pptx_with_sources_and_renders(self) -> None:
         model = valid_model()
+        model["target"] = (
+            "Synthetic MCP Extension (example.synthetic-mcp) with a deliberately "
+            "long descriptive deployment target"
+        )
         long_outcome = (
             "Preserve the complete executive outcome even when it exceeds the former "
             "presentation shortening threshold, because a derivative must not silently "
             "remove a material condition, limitation, scope statement, or control requirement."
         )
         model["executive_outcomes"][0] = long_outcome
+        long_recommendation = (
+            "Preserve the complete remediation text across slide pagination, including "
+            "least privilege, credential rotation, audit evidence, incident response, "
+            "rollback verification and residual-risk acceptance before deployment. REF-001"
+        )
+        model["findings"][0]["recommendation"] = long_recommendation
         model["references"].extend([
             {
                 "id": f"REF-{index:03d}",
@@ -670,11 +680,15 @@ class AssessmentPptxTests(unittest.TestCase):
             for name in sorted(item for item in names if item.startswith("ppt/slides/slide") and item.endswith(".xml")):
                 document = ElementTree.fromstring(archive.read(name))
                 slide_text[name] = [element.text or "" for element in document.iter() if element.tag.endswith("}t")]
+            all_slide_text = [text for values in slide_text.values() for text in values]
             condition_four = next(values for values in slide_text.values() if any("Condition 4" in value for value in values))
             condition_five = next(values for values in slide_text.values() if any("Condition 5" in value for value in values))
             self.assertIn("04", condition_four)
             self.assertIn("05", condition_five)
-            self.assertIn(long_outcome, [text for values in slide_text.values() for text in values])
+            self.assertIn(long_outcome, all_slide_text)
+            self.assertIn(long_recommendation, all_slide_text)
+            self.assertIn(model["assessment"], slide_text["ppt/slides/slide1.xml"])
+            self.assertFalse(any("…" in value for value in all_slide_text))
         build_manifest = json.loads(manifest.read_text(encoding="utf-8"))
         self.assertEqual(build_manifest["native_powerpoint_closeout"], "Pending")
         self.assertEqual(build_manifest["output"]["slide_count"], summary["slide_count"])

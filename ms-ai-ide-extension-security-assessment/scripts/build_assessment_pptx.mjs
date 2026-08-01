@@ -637,13 +637,6 @@ async function safeOutput(workspaceRoot, filename, expectedExtension) {
   return resolved;
 }
 
-function shorten(value, maximum) {
-  const clean = String(value).replace(/\s+/g, " ").trim();
-  if (clean.length <= maximum) return clean;
-  const candidate = clean.slice(0, maximum - 1).replace(/\s+\S*$/, "").trim();
-  return `${candidate || clean.slice(0, maximum - 1)}…`;
-}
-
 function notesFor(model, ids) {
   const byId = new Map([
     ...model.references.map((item) => [item.id, { ...item, detail: item.url }]),
@@ -687,7 +680,7 @@ function addFooter(slide, number, model) {
 }
 
 function addTitle(slide, title, number, model) {
-  addText(slide, `slide-title-${number}`, shorten(title, 58), { left: 41, top: 34, width: 1198, height: 100 }, 40, { bold: true });
+  addText(slide, `slide-title-${number}`, title, { left: 41, top: 34, width: 1198, height: 100 }, 40, { bold: true });
   addFooter(slide, number, model);
 }
 
@@ -700,8 +693,8 @@ function addCover(presentation, model) {
   const slide = presentation.slides.add();
   slide.background.fill = "#FFFFFF";
   addText(slide, "cover-kicker", "MICROSOFT IDE AI EXTENSION SECURITY ASSESSMENT", { left: 41, top: 42, width: 760, height: 52 }, 24, { color: "#3D8DFF", bold: true });
-  addText(slide, "cover-title", shorten(model.target, 56), { left: 41, top: 174, width: 1050, height: 260 }, 72, { bold: true, verticalAlignment: "bottom" });
-  addText(slide, "cover-subtitle", `${model.publisher} · ${model.version} · ${model.ide_scope.join(" / ")}`, { left: 41, top: 490, width: 940, height: 105 }, 24, { color: "#303842" });
+  addText(slide, "cover-title", model.assessment, { left: 41, top: 174, width: 1050, height: 260 }, 72, { bold: true, verticalAlignment: "bottom" });
+  addText(slide, "cover-subtitle", `${model.publisher} · ${model.extension_id} · ${model.version} · ${model.ide_scope.join(" / ")}`, { left: 41, top: 490, width: 940, height: 105 }, 24, { color: "#303842" });
   addText(slide, "cover-control", `${model.assessment_date} · Document ${model.document_version} · PUBLIC`, { left: 41, top: 620, width: 800, height: 34 }, 18, { color: "#58616B" });
   setNotes(slide, model, model.derivative_sources.cover);
 }
@@ -769,7 +762,7 @@ function addArchitectureSlides(presentation, model, number) {
   });
   nodes.forEach((node, index) => {
     const position = positions.get(node);
-    addText(slide, `architecture-node-label-${index}`, shorten(node, 52), { left: position.left + 12, top: position.top + 12, width: position.width - 24, height: position.height - 24 }, 20, { bold: true, alignment: "center", verticalAlignment: "middle" });
+    addText(slide, `architecture-node-label-${index}`, node, { left: position.left + 12, top: position.top + 12, width: position.width - 24, height: position.height - 24 }, 20, { bold: true, alignment: "center", verticalAlignment: "middle" });
   });
   setNotes(slide, model, model.derivative_sources.figure);
   const chunks = [];
@@ -783,8 +776,8 @@ function addArchitectureSlides(presentation, model, number) {
       const absoluteIndex = chunkIndex * 6 + index;
       const top = 155 + index * 80;
       addText(detail, `flow-index-${absoluteIndex}`, String(absoluteIndex + 1).padStart(2, "0"), { left: 41, top, width: 65, height: 42 }, 22, { bold: true, color: "#3D8DFF" });
-      addText(detail, `flow-route-${absoluteIndex}`, shorten(`${source} → ${target}`, 62), { left: 125, top, width: 470, height: 50 }, 20, { bold: true });
-      addText(detail, `flow-label-${absoluteIndex}`, shorten(label, 150), { left: 620, top, width: 580, height: 50 }, 20, { color: "#303842" });
+      addText(detail, `flow-route-${absoluteIndex}`, `${source} → ${target}`, { left: 125, top, width: 470, height: 50 }, 20, { bold: true });
+      addText(detail, `flow-label-${absoluteIndex}`, label, { left: 620, top, width: 580, height: 50 }, 20, { color: "#303842" });
       if (index < edges.length - 1) detail.shapes.add({ geometry: "rect", name: `flow-rule-${absoluteIndex}`, position: { left: 41, top: top + 62, width: 1198, height: 1 }, fill: "#D5D8DC", line: { style: "solid", fill: "none", width: 0 } });
     });
     setNotes(detail, model, model.derivative_sources.figure);
@@ -806,19 +799,19 @@ function ratingScore(value) {
 function addFindingSlides(presentation, model, startNumber) {
   const sorted = [...model.findings].sort((a, b) => ratingScore(b.residual) - ratingScore(a.residual) || a.id.localeCompare(b.id));
   const chunks = [];
-  for (let index = 0; index < sorted.length; index += 4) chunks.push(sorted.slice(index, index + 4));
+  for (let index = 0; index < sorted.length; index += 3) chunks.push(sorted.slice(index, index + 3));
   chunks.forEach((findings, chunkIndex) => {
     const number = startNumber + chunkIndex;
     const slide = presentation.slides.add();
     slide.background.fill = "#FFFFFF";
     addTitle(slide, chunkIndex === 0 ? "Residual risk concentrates in these findings" : "Additional findings remain within the treatment plan", number, model);
     findings.forEach((finding, index) => {
-      const top = 160 + index * 118;
+      const top = 155 + index * 165;
       addText(slide, `finding-id-${number}-${index}`, finding.id, { left: 41, top, width: 125, height: 36 }, 22, { bold: true, color: "#3D8DFF" });
-      addText(slide, `finding-title-${number}-${index}`, shorten(finding.title, 88), { left: 180, top, width: 680, height: 56 }, 22, { bold: true });
-      addText(slide, `finding-rating-${number}-${index}`, `Residual ${shorten(finding.residual, 22)}`, { left: 920, top, width: 280, height: 38 }, 20, { bold: true, alignment: "right" });
-      addText(slide, `finding-action-${number}-${index}`, shorten(finding.recommendation, 155), { left: 180, top: top + 58, width: 1020, height: 45 }, 16, { color: "#303842" });
-      slide.shapes.add({ geometry: "rect", name: `finding-rule-${number}-${index}`, position: { left: 41, top: top + 108, width: 1198, height: 1 }, fill: "#D5D8DC", line: { style: "solid", fill: "none", width: 0 } });
+      addText(slide, `finding-title-${number}-${index}`, finding.title, { left: 180, top, width: 680, height: 64 }, 22, { bold: true });
+      addText(slide, `finding-rating-${number}-${index}`, `Residual ${finding.residual}`, { left: 920, top, width: 280, height: 38 }, 20, { bold: true, alignment: "right" });
+      addText(slide, `finding-action-${number}-${index}`, finding.recommendation, { left: 180, top: top + 68, width: 1020, height: 78 }, 16, { color: "#303842" });
+      slide.shapes.add({ geometry: "rect", name: `finding-rule-${number}-${index}`, position: { left: 41, top: top + 154, width: 1198, height: 1 }, fill: "#D5D8DC", line: { style: "solid", fill: "none", width: 0 } });
     });
     setNotes(slide, model, findings.flatMap((finding) => model.derivative_sources.findings[finding.id]));
   });
@@ -841,7 +834,7 @@ function addControlSlides(presentation, model, startNumber) {
       const left = 41 + column * 615;
       const top = 185 + row * 215;
       addText(slide, `control-number-${number}-${index}`, String(chunkIndex * chunkSize + index + 1).padStart(2, "0"), { left, top, width: 70, height: 40 }, 24, { bold: true, color: "#3D8DFF" });
-      addText(slide, `control-copy-${number}-${index}`, shorten(condition, 205), { left: left + 85, top, width: 485, height: 150 }, 20);
+      addText(slide, `control-copy-${number}-${index}`, condition, { left: left + 85, top, width: 485, height: 150 }, 20);
     });
     setNotes(slide, model, model.derivative_sources.approval_conditions.slice(chunkIndex * chunkSize, chunkIndex * chunkSize + conditions.length).flat());
   });
