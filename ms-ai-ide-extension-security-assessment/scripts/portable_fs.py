@@ -33,7 +33,9 @@ def _reject_windows_lexical_reparse_ancestors(absolute: Path) -> None:
         except FileNotFoundError:
             break
         if is_link_or_reparse(observed):
-            raise ValueError(f"path component is a symlink, junction, or reparse point: {cursor}")
+            raise ValueError(
+                f"path component must be non-symlink, non-junction, and non-reparse: {cursor}"
+            )
 
 
 def require_real_directory(path: Path) -> Path:
@@ -99,7 +101,10 @@ def _windows_descriptor(path: Path, *, write: bool, create_new: bool) -> int:
     )
     create_file.restype = wintypes.HANDLE
     access = (0x40000000 | 0x00010000) if write else 0x80000000  # GENERIC_WRITE + DELETE / GENERIC_READ
-    share = 0 if write else 0x00000001 | 0x00000002 | 0x00000004
+    # Permit only delete/rename sharing for an exclusive output.  This lets the
+    # post-open identity check observe and reject a parent rename race without
+    # allowing another process to read from or write to the file.
+    share = 0x00000004 if write else 0x00000001 | 0x00000002 | 0x00000004
     disposition = 1 if create_new else 3  # CREATE_NEW / OPEN_EXISTING
     flags = 0x00200000 | 0x00000080  # OPEN_REPARSE_POINT | NORMAL
     invalid = wintypes.HANDLE(-1).value

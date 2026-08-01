@@ -7,8 +7,8 @@
     },
     {
       "path": "pptx-runtime-acceptance.json",
-      "sha256": "f69c66df73f4cb0f8be7641436c748b312585566d207506daf6cb1c74353deb2",
-      "size": 1323
+      "sha256": "b5fdb8ddf20f008a9a1d1d2381ec42cc23365701b15bad254dc830735213703f",
+      "size": 1325
     },
     {
       "path": "references/authoritative-report-standard.md",
@@ -112,8 +112,8 @@
     },
     {
       "path": "scripts/build_release_archive.py",
-      "sha256": "d20eedd5cc93d91740fce1703808cd7cb82c16b8c7f08b8a53fdf67e1975120e",
-      "size": 2187
+      "sha256": "472ad6bf5c55462ae13f4746bcdf1d2c9ca796ce9b693cd0dcf8d1cb34dce8cd",
+      "size": 2417
     },
     {
       "path": "scripts/build_release_manifest.py",
@@ -152,8 +152,8 @@
     },
     {
       "path": "scripts/portable_fs.py",
-      "sha256": "6083012f73d097454a74244af146adf62c7a11e00c133e018eea242919799f6b",
-      "size": 10207
+      "sha256": "c4664cde1e52b0de9e7dc46413bc305270acd0f4be1a7b98e0a0f004c21835e7",
+      "size": 10481
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.applescript",
@@ -227,8 +227,8 @@
     },
     {
       "path": "scripts/test_inspect_vsix.py",
-      "sha256": "d5331408af6b76c50f6dc4f1d3dc05e8ff08c90740e20cb89a242c6374f3d6d9",
-      "size": 11602
+      "sha256": "2630b69838c18742dec17fba6b93727df317b31e7ba1e2968e8cd97ce926cef8",
+      "size": 13789
     },
     {
       "path": "scripts/test_portable_fs.py",

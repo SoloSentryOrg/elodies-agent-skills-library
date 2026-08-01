@@ -12,6 +12,7 @@ from unittest import mock
 SCRIPTS = Path(__file__).parent
 if str(SCRIPTS) not in sys.path:
     sys.path.insert(0, str(SCRIPTS))
+import portable_fs  # noqa: E402
 from inspect_vsix import (  # noqa: E402
     VsixError,
     _write_inventory_exclusive,
@@ -97,6 +98,7 @@ class VsixInspectionTests(unittest.TestCase):
             with zipfile.ZipFile(replacement, "w", zipfile.ZIP_DEFLATED) as package:
                 package.writestr("extension/package.json", '{"name":"replacement","version":"2.0.0"}')
             real_open = os.open
+            real_windows_open = portable_fs._windows_descriptor
             raced = False
 
             def replace_before_open(
@@ -109,10 +111,22 @@ class VsixInspectionTests(unittest.TestCase):
                     replacement.rename(path)
                 return real_open(target, flags, *args, **kwargs)
 
-            with (
-                mock.patch("inspect_vsix.os.open", side_effect=replace_before_open),
-                self.assertRaisesRegex(VsixError, "path changed"),
-            ):
+            def replace_before_windows_open(
+                target: Path, *, write: bool, create_new: bool
+            ) -> int:
+                nonlocal raced
+                if not raced and target == path.resolve() and not write:
+                    raced = True
+                    path.rename(original)
+                    replacement.rename(path)
+                return real_windows_open(target, write=write, create_new=create_new)
+
+            patcher = (
+                mock.patch("portable_fs._windows_descriptor", side_effect=replace_before_windows_open)
+                if os.name == "nt"
+                else mock.patch("inspect_vsix.os.open", side_effect=replace_before_open)
+            )
+            with patcher, self.assertRaisesRegex(VsixError, "path changed"):
                 inspect_vsix(path)
 
     def test_archive_descriptor_survives_path_swap_after_open(self) -> None:
@@ -124,6 +138,7 @@ class VsixInspectionTests(unittest.TestCase):
             with zipfile.ZipFile(replacement, "w", zipfile.ZIP_DEFLATED) as package:
                 package.writestr("extension/package.json", '{"name":"replacement","version":"2.0.0"}')
             real_open = os.open
+            real_windows_open = portable_fs._windows_descriptor
             raced = False
 
             def replace_after_open(
@@ -137,7 +152,23 @@ class VsixInspectionTests(unittest.TestCase):
                     replacement.rename(path)
                 return descriptor
 
-            with mock.patch("inspect_vsix.os.open", side_effect=replace_after_open):
+            def replace_after_windows_open(
+                target: Path, *, write: bool, create_new: bool
+            ) -> int:
+                nonlocal raced
+                descriptor = real_windows_open(target, write=write, create_new=create_new)
+                if not raced and target == path.resolve() and not write:
+                    raced = True
+                    path.rename(original)
+                    replacement.rename(path)
+                return descriptor
+
+            patcher = (
+                mock.patch("portable_fs._windows_descriptor", side_effect=replace_after_windows_open)
+                if os.name == "nt"
+                else mock.patch("inspect_vsix.os.open", side_effect=replace_after_open)
+            )
+            with patcher:
                 result, _ = inspect_vsix(path)
             self.assertEqual(result["package_manifest"]["name"], "fixture")
 
@@ -151,6 +182,7 @@ class VsixInspectionTests(unittest.TestCase):
             with zipfile.ZipFile(replacement, "w", zipfile.ZIP_DEFLATED) as package:
                 package.writestr("extension/package.json", '{"name":"replacement","version":"2.0.0"}')
             real_open = os.open
+            real_windows_open = portable_fs._windows_descriptor
             raced = False
 
             def replace_after_open(
@@ -164,8 +196,24 @@ class VsixInspectionTests(unittest.TestCase):
                     replacement.rename(path)
                 return descriptor
 
+            def replace_after_windows_open(
+                target: Path, *, write: bool, create_new: bool
+            ) -> int:
+                nonlocal raced
+                descriptor = real_windows_open(target, write=write, create_new=create_new)
+                if not raced and target == path.resolve() and not write:
+                    raced = True
+                    path.rename(original)
+                    replacement.rename(path)
+                return descriptor
+
             output = root / "out"
-            with mock.patch("inspect_vsix.os.open", side_effect=replace_after_open):
+            patcher = (
+                mock.patch("portable_fs._windows_descriptor", side_effect=replace_after_windows_open)
+                if os.name == "nt"
+                else mock.patch("inspect_vsix.os.open", side_effect=replace_after_open)
+            )
+            with patcher:
                 extract_vsix(path, output, entries, str(result["archive_sha256"]))
             self.assertIn('"name":"fixture"', (output / "extension/package.json").read_text())
 

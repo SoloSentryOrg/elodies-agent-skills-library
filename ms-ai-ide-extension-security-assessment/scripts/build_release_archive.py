@@ -30,7 +30,10 @@ def create_archive(source: Path, output: Path) -> None:
                 info.external_attr = 0o100600 << 16
                 info.create_system = 3
                 archive.writestr(info, data, compress_type=zipfile.ZIP_DEFLATED, compresslevel=9)
-        descriptor = os.open(temporary, os.O_RDONLY | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
+        # Windows rejects fsync on a read-only descriptor.  The temporary is a
+        # task-owned exclusive output, so reopening it read/write preserves the
+        # durability gate without broadening access to an external file.
+        descriptor = os.open(temporary, os.O_RDWR | getattr(os, "O_BINARY", 0) | getattr(os, "O_NOFOLLOW", 0))
         try: os.fsync(descriptor)
         finally: os.close(descriptor)
         os.link(temporary, parent / output.name)
