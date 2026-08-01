@@ -232,8 +232,8 @@
     },
     {
       "path": "scripts/test_portable_fs.py",
-      "sha256": "1037de893d545c6dda38464b870bca577ccd43e17a1e25169387c5ac3b02d2bd",
-      "size": 7477
+      "sha256": "0f9a104cedb0efb37d35fc359419144352c5cb8ce68e8df0c98eefecd5304f28",
+      "size": 7525
     },
     {
       "path": "scripts/test_portable_package.py",

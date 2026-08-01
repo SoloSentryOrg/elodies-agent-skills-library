@@ -125,6 +125,7 @@ class PortableFilesystemTests(unittest.TestCase):
             root = Path(directory)
             safe = root / "safe"
             safe.mkdir()
+            safe = require_real_directory(safe)
             moved = root / "moved"
             output = safe / "output.bin"
             descriptor = portable_fs._windows_descriptor(
