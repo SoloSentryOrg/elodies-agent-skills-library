@@ -1,0 +1,3 @@
+# The signed package manifest hashes repository bytes. Keep every distributed
+# skill file byte-identical across Windows, macOS, and Linux checkouts.
+ms-ai-ide-extension-security-assessment/** text eol=lf
