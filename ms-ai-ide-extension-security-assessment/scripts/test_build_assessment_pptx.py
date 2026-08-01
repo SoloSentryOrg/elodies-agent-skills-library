@@ -137,7 +137,7 @@ class AssessmentPptxTests(unittest.TestCase):
         qa = self.root / "office-native-qa.json"
         qa_payload = {
             "schema_version": 1,
-            "assessment": model["target"],
+            "assessment": model["assessment"],
             "run_key": model["run_key"],
             "status": "Passed",
             "word": {
@@ -194,6 +194,19 @@ class AssessmentPptxTests(unittest.TestCase):
             "result": "Passed",
         }
         qa.write_text(json.dumps(payload), encoding="utf-8")
+
+        result = self.run_builder(
+            "--stage-root", str(self.stage_root), "--validate-only", *word_args
+        )
+
+        self.assertEqual(result.returncode, 0, result.stderr)
+        self.assertTrue(json.loads(result.stdout)["authoritative_word"])
+
+    def test_word_qa_binding_uses_authoritative_assessment_identity(self) -> None:
+        model = valid_model()
+        model["target"] = "Synthetic MCP Extension (example.synthetic-mcp)"
+        self.write_model(model)
+        word_args = self.write_word_closeout(model)
 
         result = self.run_builder(
             "--stage-root", str(self.stage_root), "--validate-only", *word_args

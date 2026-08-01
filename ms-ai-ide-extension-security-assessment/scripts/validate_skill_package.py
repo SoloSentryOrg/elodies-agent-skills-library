@@ -67,7 +67,7 @@ REQUIRED_PATHS = {
 }
 MANIFEST_NAME = "package-manifest.json"
 SOURCE_REPOSITORY = "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
-SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.1"
+SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.2"
 MAX_FILE_BYTES = 16 * 1024 * 1024
 
 
