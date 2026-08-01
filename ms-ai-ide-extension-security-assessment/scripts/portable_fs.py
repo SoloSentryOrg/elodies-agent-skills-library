@@ -44,8 +44,6 @@ def require_real_directory(path: Path) -> Path:
         raise ValueError(f"directory must not be a symlink, junction, or reparse point: {absolute}")
     resolved = absolute.resolve(strict=True)
     if os.name == "nt":
-        if _normalise_windows_handle_path(str(resolved)) != _normalise_windows_handle_path(str(absolute)):
-            raise ValueError(f"directory resolved outside its validated lexical path: {absolute}")
         after = absolute.lstat()
         if (
             is_link_or_reparse(after)
@@ -53,7 +51,12 @@ def require_real_directory(path: Path) -> Path:
             or (metadata.st_dev, metadata.st_ino) != (after.st_dev, after.st_ino)
         ):
             raise ValueError(f"directory changed identity during validation: {absolute}")
-        return absolute
+        # Windows can expose a legitimate path through an 8.3 alias (for
+        # example RUNNER~1 on GitHub-hosted runners).  Return the resolved long
+        # path only after the lexical path and directory identity have both
+        # been rechecked.  Subsequent handle-path comparison then distinguishes
+        # harmless alias normalisation from an actual junction/rename escape.
+        return resolved
     return resolved
 
 

@@ -152,8 +152,8 @@
     },
     {
       "path": "scripts/portable_fs.py",
-      "sha256": "03cd80720621e90b894d2fd9dc6abb586488fef3052d0504c5232c540f3f25ba",
-      "size": 10026
+      "sha256": "6083012f73d097454a74244af146adf62c7a11e00c133e018eea242919799f6b",
+      "size": 10207
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.applescript",
