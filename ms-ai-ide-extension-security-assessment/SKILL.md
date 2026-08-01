@@ -2,7 +2,7 @@
 name: ms-ai-ide-extension-security-assessment
 description: Research and assess AI-related Visual Studio and VS Code extensions, MCP integrations, and installed Agent Skills using a repeatable, evidence-led security methodology. Use when Codex must produce or update a professional Microsoft Word extension assessment, installation manifest, OWASP/agentic/financial-sector mapping, risk register, diagrams, SBOM-style inventory, Markdown report, or concise executive derivative.
 metadata:
-  version: "1.3.0"
+  version: "1.4.0"
 ---
 
 # Assess Microsoft IDE AI Extensions
@@ -23,6 +23,11 @@ metadata:
 - Default static analysis, static malware review, and runtime analysis to **Yes**. Treat these defaults as standing authorization only for non-destructive work inside a disposable, least-privilege, revertible test environment using synthetic data and no production credentials. The defaults do not authorize detonation, destructive testing, persistence, credential access, lateral movement, or contact with nonessential third-party endpoints.
 - Do not silently downgrade a selected analysis branch. If safe runtime prerequisites are unavailable, complete the safe available work, record the exact gap, and set the affected approval decision to `Defer pending evidence` unless the remaining evidence independently supports a stricter decision.
 - Apply least privilege, secure-by-default design, defense in depth, OWASP guidance, and safe handling of potentially malicious packages.
+- Read [references/portable-execution.md](references/portable-execution.md) before selecting bundled core or optional helpers. Prefer host Office artifact skills when available, but use the bundled deterministic scripts instead of recreating generic compilers, validators, VSIX inspection, or installation logic.
+- Treat Windows, macOS, and Linux as supported core hosts. Select the bundled
+  Windows PowerShell or macOS AppleScript Office adapter only when native
+  Microsoft Office QA is required on that platform; never make the core
+  assessment workflow depend on one operating system's automation surface.
 
 ## Preliminary identity and intake gate
 
@@ -51,7 +56,7 @@ Proceed without further questions when the user supplied enough information and 
 8. **Score consistently.** Use [references/scoring.md](references/scoring.md). Score likelihood, impact, inherent risk, control strength, and residual risk. State rationale, evidence, confidence, affected IDE/version, recommended control, owner, and verification test for each finding.
 9. **Write the authoritative report.** Follow [references/report-structure.md](references/report-structure.md), [references/authoritative-report-standard.md](references/authoritative-report-standard.md), and [references/office-artifact-workflow.md](references/office-artifact-workflow.md). Build the report from the validated stage outputs, never from a shortened conversational summary. Make the detailed report the grounded source for derivatives. Use internal Word bookmarks and hyperlinks so every in-text citation links to its corresponding references-table entry; include the external source hyperlink in that entry. Emit a build manifest binding every input and the candidate report by SHA-256.
 10. **Generate requested derivatives.** From the verified detailed assessment, optionally create PowerPoint, Excel risk register, architecture/data-flow/trust-boundary diagrams, Markdown, SBOM-style inventory, or a concise executive report. Follow [references/derivatives.md](references/derivatives.md) and the applicable artifact skill. Do not introduce claims absent from the authoritative report.
-11. **Quality gate.** Run [references/quality-gates.md](references/quality-gates.md). Run `python scripts/validate_assessment_report.py <report.docx>` from this skill folder, or the repository-provided equivalent when it is stricter. Resolve every failure; waivers and warning-only delivery are not permitted for an authoritative report. Render with Microsoft Word, inspect every page at full size, and record the report hash and validation result before delivery.
+11. **Quality gate.** Run [references/quality-gates.md](references/quality-gates.md). Run `python scripts/validate_assessment_report.py <report.docx>` from this skill folder. A repository may add stricter policy gates but must not replace this portable baseline with a weaker validator. Resolve every failure; waivers and warning-only delivery are not permitted for an authoritative report. Render with Microsoft Word, inspect every page at full size, and record the report hash and validation result before delivery.
 12. **Prepare approved publication handoff.** When the repository defines a
     publication pipeline and the user explicitly requests public publication,
     prepare its release request only after every authoritative-report gate

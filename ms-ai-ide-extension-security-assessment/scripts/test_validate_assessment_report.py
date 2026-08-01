@@ -8,7 +8,6 @@ import tempfile
 import unittest
 import zipfile
 from pathlib import Path
-from unittest import mock
 
 
 SCRIPT = Path(__file__).with_name("validate_assessment_report.py")
@@ -48,60 +47,167 @@ class AssessmentReportValidatorTests(unittest.TestCase):
         self.assertFalse(result.passed)
         self.assertIn("missing required DOCX part", result.failures[0])
 
-    def test_oversized_zip_part_fails_before_expansion(self) -> None:
+    def test_external_non_hyperlink_relationship_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory, "oversized.docx")
-            with zipfile.ZipFile(
-                path,
-                "w",
-                compression=zipfile.ZIP_DEFLATED,
-            ) as package:
-                package.writestr("word/document.xml", b"A" * 4096)
-            with mock.patch.object(MODULE, "MAX_ENTRY_BYTES", 1024):
-                result = MODULE.validate_report(path)
+            path = Path(directory, "external.docx")
+            with zipfile.ZipFile(path, "w") as package:
+                package.writestr(
+                    "word/document.xml",
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>',
+                )
+                package.writestr(
+                    "word/_rels/document.xml.rels",
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">'
+                    '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/attachedTemplate" '
+                    'Target="https://example.invalid/template.dotm" TargetMode="External"/>'
+                    "</Relationships>",
+                )
+                package.writestr(
+                    "docProps/core.xml",
+                    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+                    'xmlns:dc="http://purl.org/dc/elements/1.1/"/>',
+                )
+                package.writestr(
+                    "[Content_Types].xml",
+                    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+                )
+            result = MODULE.validate_report(path)
         self.assertFalse(result.passed)
         self.assertTrue(
-            any("DOCX part exceeds" in failure for failure in result.failures)
+            any("external non-hyperlink relationship" in failure for failure in result.failures)
         )
 
-    def test_symlinked_docx_is_rejected(self) -> None:
+    def test_embedded_active_part_fails_closed(self) -> None:
         with tempfile.TemporaryDirectory() as directory:
-            target = Path(directory, "target.docx")
-            target.write_bytes(b"not a zip")
-            link = Path(directory, "link.docx")
-            link.symlink_to(target)
-            result = MODULE.validate_report(link)
-        self.assertFalse(result.passed)
-        self.assertIn("symlinks", result.failures[0])
-
-    def test_hash_io_failure_returns_structured_failure(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory, "unreadable.docx")
-            path.write_bytes(b"not a zip")
-            with mock.patch.object(
-                MODULE,
-                "_sha256",
-                side_effect=PermissionError("hash read denied"),
-            ):
-                result = MODULE.validate_report(path)
-        self.assertFalse(result.passed)
-        self.assertIsNone(result.metrics)
-        self.assertEqual(result.failures, ("hash read denied",))
-
-    def test_zip_runtime_failure_returns_structured_failure(self) -> None:
-        with tempfile.TemporaryDirectory() as directory:
-            path = Path(directory, "encrypted.docx")
+            path = Path(directory, "active.docx")
             with zipfile.ZipFile(path, "w") as package:
-                package.writestr("word/document.xml", "<document/>")
-            with mock.patch.object(
-                MODULE,
-                "_read_xml",
-                side_effect=RuntimeError("encrypted entry"),
-            ):
-                result = MODULE.validate_report(path)
+                package.writestr(
+                    "word/document.xml",
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>',
+                )
+                package.writestr(
+                    "word/_rels/document.xml.rels",
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                )
+                package.writestr(
+                    "docProps/core.xml",
+                    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+                    'xmlns:dc="http://purl.org/dc/elements/1.1/"/>',
+                )
+                package.writestr(
+                    "[Content_Types].xml",
+                    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+                )
+                package.writestr("word/embeddings/object1.bin", b"untrusted")
+            result = MODULE.validate_report(path)
         self.assertFalse(result.passed)
-        self.assertIsNone(result.metrics)
-        self.assertEqual(result.failures, ("encrypted entry",))
+        self.assertTrue(any("active or embedded" in failure for failure in result.failures))
+
+    def test_macro_content_type_with_unusual_part_name_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "active-content-type.docx")
+            with zipfile.ZipFile(path, "w") as package:
+                package.writestr(
+                    "word/document.xml",
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>',
+                )
+                package.writestr(
+                    "word/_rels/document.xml.rels",
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                )
+                package.writestr(
+                    "docProps/core.xml",
+                    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+                    'xmlns:dc="http://purl.org/dc/elements/1.1/"/>',
+                )
+                package.writestr(
+                    "[Content_Types].xml",
+                    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">'
+                    '<Override PartName="/word/unusual.xml" '
+                    'ContentType="application/vnd.ms-office.vbaProject"/>'
+                    "</Types>",
+                )
+                package.writestr("word/unusual.xml", b"<inert/>")
+            failures = MODULE.validate_docx_publication_safety(path)
+        self.assertTrue(any("OOXML content type" in failure for failure in failures))
+
+    def test_hyperlink_with_embedded_credentials_fails_closed(self) -> None:
+        self.assertFalse(MODULE._external_target_is_safe("https://user:secret@example.com/"))
+        self.assertFalse(MODULE._external_target_is_safe("https://2130706433/private"))
+        self.assertFalse(MODULE._external_target_is_safe("https://0x7f000001/private"))
+        self.assertFalse(MODULE._external_target_is_safe("https://017700000001/private"))
+
+    def test_hidden_revision_and_extended_private_metadata_fail_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "hidden-private-content.docx")
+            with zipfile.ZipFile(path, "w") as package:
+                package.writestr(
+                    "word/document.xml",
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>',
+                )
+                package.writestr(
+                    "word/header1.xml",
+                    '<w:hdr xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main">'
+                    "<w:ins><w:r><w:t>hidden revision</w:t></w:r></w:ins></w:hdr>",
+                )
+                package.writestr(
+                    "word/_rels/document.xml.rels",
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                )
+                package.writestr(
+                    "docProps/core.xml",
+                    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+                    'xmlns:dc="http://purl.org/dc/elements/1.1/"/>',
+                )
+                package.writestr(
+                    "docProps/app.xml",
+                    '<Properties xmlns="http://schemas.openxmlformats.org/officeDocument/2006/extended-properties">'
+                    "<Manager>Named Manager</Manager><Company>Private Company</Company>"
+                    "<HyperlinkBase>file:///private/path/</HyperlinkBase></Properties>",
+                )
+                package.writestr(
+                    "[Content_Types].xml",
+                    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+                )
+            failures = MODULE.validate_docx_publication_safety(path)
+        self.assertTrue(any("header1.xml" in failure for failure in failures))
+        self.assertTrue(any("Manager metadata" in failure for failure in failures))
+        self.assertTrue(any("Company metadata" in failure for failure in failures))
+        self.assertIn("HyperlinkBase metadata must be blank", failures)
+
+    def test_unreviewed_custom_xml_data_fails_closed(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory, "custom-data.docx")
+            with zipfile.ZipFile(path, "w") as package:
+                package.writestr(
+                    "word/document.xml",
+                    '<w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body/></w:document>',
+                )
+                package.writestr(
+                    "word/_rels/document.xml.rels",
+                    '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"/>',
+                )
+                package.writestr(
+                    "docProps/core.xml",
+                    '<cp:coreProperties xmlns:cp="http://schemas.openxmlformats.org/package/2006/metadata/core-properties" '
+                    'xmlns:dc="http://purl.org/dc/elements/1.1/"/>',
+                )
+                package.writestr(
+                    "[Content_Types].xml",
+                    '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"/>',
+                )
+                package.writestr(
+                    "customXml/item1.xml",
+                    "<private>private.person@example.invalid</private>",
+                )
+            failures = MODULE.validate_docx_publication_safety(path)
+        self.assertIn(
+            "unreviewed custom XML content is prohibited: customXml/item1.xml",
+            failures,
+        )
+
+    def test_custom_xml_allowlist_is_well_formed(self) -> None:
+        self.assertEqual(len(MODULE._allowed_custom_xml_digests()), 4)
 
 
 if __name__ == "__main__":

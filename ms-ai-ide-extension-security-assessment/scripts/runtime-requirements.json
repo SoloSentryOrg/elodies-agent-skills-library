@@ -1,0 +1,15 @@
+{
+  "schema_version": 1,
+  "core": {
+    "python": ">=3.11",
+    "python_dependencies": "requirements.lock",
+    "operating_systems": ["Windows 10/11 or Windows Server with NTFS", "macOS", "Linux"],
+    "secure_filesystem_helpers": "portable_fs.py uses descriptor-relative no-follow operations on POSIX and rejects Windows symlinks, junctions, and reparse-point ancestors with identity-bound reads and exclusive writes"
+  },
+  "optional": {
+    "native_word_rendering": "Microsoft Word for Windows through PowerShell COM automation or Microsoft Word for macOS with AppleScript authorization",
+    "native_powerpoint_rendering": "Microsoft PowerPoint for Windows through PowerShell COM automation or Microsoft PowerPoint for macOS with AppleScript authorization",
+    "powerpoint_generation": "Node.js ES modules and host-provided @oai/artifact-tool bound by create_artifact_runtime_receipt.mjs",
+    "pdf_page_rendering": "host document/PDF capability or an explicitly trusted, version-bound renderer"
+  }
+}

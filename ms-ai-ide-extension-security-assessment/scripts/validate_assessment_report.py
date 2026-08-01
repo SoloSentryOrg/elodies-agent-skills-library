@@ -5,14 +5,22 @@ from __future__ import annotations
 
 import argparse
 import hashlib
+import io
+import ipaddress
 import json
+import os
 import re
+import socket
+import stat
 import sys
 import zipfile
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Iterable
+from urllib.parse import urlsplit
 from xml.etree import ElementTree as ET
+
+from portable_fs import bounded_read
 
 
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
@@ -20,6 +28,7 @@ R = "http://schemas.openxmlformats.org/officeDocument/2006/relationships"
 PR = "http://schemas.openxmlformats.org/package/2006/relationships"
 CP = "http://schemas.openxmlformats.org/package/2006/metadata/core-properties"
 DC = "http://purl.org/dc/elements/1.1/"
+EP = "http://schemas.openxmlformats.org/officeDocument/2006/extended-properties"
 
 NS = {"w": W, "r": R, "pr": PR, "cp": CP, "dc": DC}
 WORD_RE = re.compile(r"\b[\w'-]+\b", re.UNICODE)
@@ -38,6 +47,34 @@ MAX_PACKAGE_ENTRIES = 2_000
 MAX_ENTRY_BYTES = 32 * 1024 * 1024
 MAX_UNCOMPRESSED_BYTES = 200 * 1024 * 1024
 MAX_COMPRESSION_RATIO = 1_000
+
+ACTIVE_PART_PREFIXES = (
+    "word/activeX/",
+    "word/embeddings/",
+    "word/vbaProject",
+)
+ACTIVE_CONTENT_TYPE_MARKERS = (
+    "macroenabled",
+    "vbaproject",
+    "activex",
+    "oleobject",
+)
+ACTIVE_RELATIONSHIP_SUFFIXES = (
+    "/attachedtemplate",
+    "/control",
+    "/oleobject",
+    "/package",
+    "/vbaproject",
+)
+PRIVATE_PART_PREFIXES = (
+    "docProps/custom.xml",
+    "word/comments",
+    "word/people",
+)
+REVISION_ELEMENTS = ("ins", "del", "moveFrom", "moveTo")
+PRIVATE_EXTENDED_PROPERTIES = ("Manager", "Company")
+PRIVATE_HOST_SUFFIXES = (".internal", ".local", ".localhost")
+CUSTOM_XML_ALLOWLIST_PATH = Path(__file__).with_name("allowed-docx-custom-xml.json")
 
 REQUIRED_HEADING_GROUPS: tuple[tuple[str, tuple[str, ...]], ...] = (
     ("document control", ("document control",)),
@@ -137,12 +174,28 @@ def _read_xml(package: zipfile.ZipFile, name: str) -> ET.Element:
         raise InvalidDocumentError(f"invalid XML in DOCX part: {name}") from exc
 
 
-def _validate_package_bounds(
-    path: Path,
-    package: zipfile.ZipFile,
-) -> tuple[str, ...]:
+def _allowed_custom_xml_digests(
+    path: Path = CUSTOM_XML_ALLOWLIST_PATH,
+) -> set[str]:
+    try:
+        data = json.loads(path.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise InvalidDocumentError("DOCX custom XML allowlist is unavailable") from exc
+    values = data.get("sha256")
+    if not isinstance(values, list) or not values:
+        raise InvalidDocumentError("DOCX custom XML allowlist must contain digests")
+    allowed = {value for value in values if isinstance(value, str)}
+    if (
+        len(allowed) != len(values)
+        or any(not re.fullmatch(r"[0-9a-f]{64}", value) for value in allowed)
+    ):
+        raise InvalidDocumentError("DOCX custom XML allowlist contains invalid digests")
+    return allowed
+
+
+def _validate_package_bounds(package_size: int, package: zipfile.ZipFile) -> list[str]:
     failures: list[str] = []
-    if path.stat().st_size > MAX_PACKAGE_BYTES:
+    if package_size > MAX_PACKAGE_BYTES:
         failures.append(f"DOCX package exceeds {MAX_PACKAGE_BYTES} bytes")
     entries = package.infolist()
     if len(entries) > MAX_PACKAGE_ENTRIES:
@@ -154,31 +207,162 @@ def _validate_package_bounds(
     for entry in entries:
         total += entry.file_size
         if entry.file_size > MAX_ENTRY_BYTES:
-            failures.append(
-                f"DOCX part exceeds {MAX_ENTRY_BYTES} bytes: {entry.filename}"
-            )
+            failures.append(f"DOCX part exceeds {MAX_ENTRY_BYTES} bytes: {entry.filename}")
         if entry.compress_size == 0:
             ratio = float("inf") if entry.file_size else 1
         else:
             ratio = entry.file_size / entry.compress_size
         if ratio > MAX_COMPRESSION_RATIO:
             failures.append(
-                "DOCX part compression ratio exceeds "
-                f"{MAX_COMPRESSION_RATIO}: {entry.filename}"
+                f"DOCX part compression ratio exceeds {MAX_COMPRESSION_RATIO}: {entry.filename}"
             )
     if total > MAX_UNCOMPRESSED_BYTES:
-        failures.append(
-            f"DOCX uncompressed content exceeds {MAX_UNCOMPRESSED_BYTES} bytes"
-        )
+        failures.append(f"DOCX uncompressed content exceeds {MAX_UNCOMPRESSED_BYTES} bytes")
+    return failures
+
+
+def _external_target_is_safe(target: str) -> bool:
+    parsed = urlsplit(target)
+    if (
+        parsed.scheme.casefold() != "https"
+        or not parsed.hostname
+        or parsed.username is not None
+        or parsed.password is not None
+    ):
+        return False
+    hostname = parsed.hostname.casefold().rstrip(".")
+    if hostname == "localhost" or hostname.endswith(PRIVATE_HOST_SUFFIXES):
+        return False
+    try:
+        address = ipaddress.ip_address(hostname)
+    except ValueError:
+        try:
+            address = ipaddress.ip_address(socket.inet_aton(hostname))
+        except OSError:
+            return True
+    return not (
+        address.is_private
+        or address.is_loopback
+        or address.is_link_local
+        or address.is_multicast
+        or address.is_reserved
+        or address.is_unspecified
+    )
+
+
+def _validate_relationships(package: zipfile.ZipFile) -> list[str]:
+    failures: list[str] = []
+    for name in package.namelist():
+        if not name.endswith(".rels"):
+            continue
+        root = _read_xml(package, name)
+        for relation in root:
+            relation_type = relation.get("Type", "")
+            if relation_type.casefold().endswith(ACTIVE_RELATIONSHIP_SUFFIXES):
+                failures.append(
+                    f"active or embedded relationship is prohibited: {name}"
+                )
+            if relation.get("TargetMode") != "External":
+                continue
+            target = relation.get("Target", "")
+            if not relation_type.endswith("/hyperlink"):
+                failures.append(f"external non-hyperlink relationship is prohibited: {name}")
+            elif not _external_target_is_safe(target):
+                failures.append(f"external hyperlink target must be public HTTPS: {target}")
+    return failures
+
+
+def _validate_active_and_private_content(package: zipfile.ZipFile) -> list[str]:
+    failures: list[str] = []
+    names = package.namelist()
+    for name in names:
+        normalized_name = name.casefold()
+        if normalized_name.endswith(".bin") or normalized_name.startswith(
+            tuple(value.casefold() for value in ACTIVE_PART_PREFIXES)
+        ):
+            failures.append(f"active or embedded DOCX part is prohibited: {name}")
+        if normalized_name.startswith(
+            tuple(value.casefold() for value in PRIVATE_PART_PREFIXES)
+        ):
+            failures.append(f"private-review DOCX part is prohibited: {name}")
+    content_types = _read_xml(package, "[Content_Types].xml")
+    for item in content_types:
+        content_type = item.get("ContentType", "").casefold()
+        if any(marker in content_type for marker in ACTIVE_CONTENT_TYPE_MARKERS):
+            failures.append(
+                "active or embedded OOXML content type is prohibited: "
+                f"{item.get('ContentType', '')}"
+            )
+    for name in names:
+        normalized_name = name.casefold()
+        if not normalized_name.startswith("word/") or not normalized_name.endswith(".xml"):
+            continue
+        part = _read_xml(package, name)
+        for local_name in REVISION_ELEMENTS:
+            if next(part.iter(f"{{{W}}}{local_name}"), None) is not None:
+                failures.append(
+                    f"tracked revision content is prohibited in {name}: w:{local_name}"
+                )
+    custom_xml_names = [
+        name
+        for name in names
+        if name.casefold().startswith("customxml/")
+        and name.casefold().endswith(".xml")
+    ]
+    allowed_custom_xml = _allowed_custom_xml_digests() if custom_xml_names else set()
+    for name in custom_xml_names:
+        digest = hashlib.sha256(package.read(name)).hexdigest()
+        if digest not in allowed_custom_xml:
+            failures.append(f"unreviewed custom XML content is prohibited: {name}")
+    return failures
+
+
+def _read_stable_docx(path: Path) -> bytes:
+    if path.suffix.casefold() != ".docx" or not path.exists():
+        raise InvalidDocumentError("input must be an existing .docx file")
+    try:
+        return bounded_read(path, MAX_PACKAGE_BYTES)[0]
+    except (OSError, ValueError) as exc:
+        raise InvalidDocumentError(str(exc)) from exc
+
+
+def _validate_docx_publication_safety_bytes(data: bytes) -> tuple[str, ...]:
+    failures: list[str] = []
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as package:
+            failures.extend(_validate_package_bounds(len(data), package))
+            if failures:
+                return tuple(sorted(set(failures)))
+            document = _read_xml(package, "word/document.xml")
+            core = _read_xml(package, "docProps/core.xml")
+            failures.extend(_validate_relationships(package))
+            failures.extend(_validate_active_and_private_content(package))
+            creator = _core_property(core, DC, "creator")
+            last_modified_by = _core_property(core, CP, "lastModifiedBy")
+            if not _metadata_is_generic(creator):
+                failures.append("creator metadata must be blank or a generic assessment identity")
+            if not _metadata_is_generic(last_modified_by):
+                failures.append("lastModifiedBy metadata must be blank or a generic assessment identity")
+            if "docProps/app.xml" in package.namelist():
+                extended = _read_xml(package, "docProps/app.xml")
+                for property_name in PRIVATE_EXTENDED_PROPERTIES:
+                    value = _core_property(extended, EP, property_name)
+                    if not _metadata_is_generic(value):
+                        failures.append(
+                            f"{property_name} metadata must be blank or a generic assessment identity"
+                        )
+                if _core_property(extended, EP, "HyperlinkBase"):
+                    failures.append("HyperlinkBase metadata must be blank")
+    except (zipfile.BadZipFile, InvalidDocumentError) as exc:
+        failures.append(str(exc))
     return tuple(sorted(set(failures)))
 
 
-def _sha256(path: Path) -> str:
-    digest = hashlib.sha256()
-    with path.open("rb") as handle:
-        for block in iter(lambda: handle.read(1024 * 1024), b""):
-            digest.update(block)
-    return digest.hexdigest()
+def validate_docx_publication_safety(path: Path) -> tuple[str, ...]:
+    try:
+        return _validate_docx_publication_safety_bytes(_read_stable_docx(path))
+    except InvalidDocumentError as exc:
+        return (str(exc),)
 
 
 def _element_text(element: ET.Element) -> str:
@@ -236,8 +420,6 @@ def _metadata_is_generic(value: str) -> bool:
         return True
     normalized = normalize(value)
     allowed = (
-        "solosentry",
-        "solosentry assessment environment",
         "assessment automation",
         "security assessment automation",
     )
@@ -246,40 +428,25 @@ def _metadata_is_generic(value: str) -> bool:
 
 def validate_report(path: Path) -> ValidationResult:
     failures: list[str] = []
-    if path.suffix.casefold() != ".docx":
-        return ValidationResult(str(path), False, None, ("input must be an existing .docx file",))
-
     try:
-        if not path.is_file():
-            return ValidationResult(
-                str(path),
-                False,
-                None,
-                ("input must be an existing .docx file",),
-            )
-        if path.is_symlink():
-            return ValidationResult(
-                str(path),
-                False,
-                None,
-                ("DOCX symlinks are prohibited",),
-            )
-        if path.stat().st_size > MAX_PACKAGE_BYTES:
-            return ValidationResult(
-                str(path),
-                False,
-                None,
-                (f"DOCX package exceeds {MAX_PACKAGE_BYTES} bytes",),
-            )
-        digest = _sha256(path)
-        with zipfile.ZipFile(path) as package:
-            bounds_failures = _validate_package_bounds(path, package)
-            if bounds_failures:
-                return ValidationResult(str(path), False, None, bounds_failures)
+        data = _read_stable_docx(path)
+    except InvalidDocumentError as exc:
+        return ValidationResult(str(path), False, None, (str(exc),))
+    safety_failures = _validate_docx_publication_safety_bytes(data)
+    if safety_failures:
+        return ValidationResult(str(path), False, None, safety_failures)
+    digest = hashlib.sha256(data).hexdigest()
+    try:
+        with zipfile.ZipFile(io.BytesIO(data)) as package:
+            failures.extend(_validate_package_bounds(len(data), package))
+            if failures:
+                return ValidationResult(str(path), False, None, tuple(sorted(set(failures))))
             document = _read_xml(package, "word/document.xml")
             relationships = _read_xml(package, "word/_rels/document.xml.rels")
             core = _read_xml(package, "docProps/core.xml")
             names = set(package.namelist())
+            failures.extend(_validate_relationships(package))
+            failures.extend(_validate_active_and_private_content(package))
             paragraphs = _paragraphs(document)
             headings = [item for item in paragraphs if item.style.casefold().startswith("heading") and item.text]
             heading_text = [normalize(item.text) for item in headings]
@@ -406,24 +573,8 @@ def validate_report(path: Path) -> ValidationResult:
                 if normalize(legend_phrase) not in normalized_text:
                     failures.append(f"risk-register legend is missing: {legend_phrase}")
 
-            creator = _core_property(core, DC, "creator")
-            last_modified_by = _core_property(core, CP, "lastModifiedBy")
-            if not _metadata_is_generic(creator):
-                failures.append("creator metadata must be blank or a generic assessment identity")
-            if not _metadata_is_generic(last_modified_by):
-                failures.append("lastModifiedBy metadata must be blank or a generic assessment identity")
-
-    except (
-        EOFError,
-        OSError,
-        RuntimeError,
-        NotImplementedError,
-        zipfile.BadZipFile,
-        zipfile.LargeZipFile,
-        InvalidDocumentError,
-    ) as exc:
-        message = str(exc).strip() or type(exc).__name__
-        return ValidationResult(str(path), False, None, (message,))
+    except (zipfile.BadZipFile, InvalidDocumentError) as exc:
+        return ValidationResult(str(path), False, None, (str(exc),))
 
     return ValidationResult(str(path), not failures, metrics, tuple(sorted(set(failures))))
 

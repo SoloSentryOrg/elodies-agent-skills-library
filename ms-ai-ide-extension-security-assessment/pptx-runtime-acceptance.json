@@ -1,0 +1,22 @@
+{
+  "artifact_runtime_receipt_sha256": "fc2b164dc8c3ccb9c9e2c522606bf0e45757e72de52edfc9223f90e688c1a142",
+  "artifact_tool_version": "2.8.36",
+  "node": "v26.5.1",
+  "output_sha256": "b0e3ca1a10943eba762b9be04872f961a5771530c41edaf763f57231b54dac39",
+  "platform": "darwin",
+  "python": "3.14.6",
+  "schema_version": 1,
+  "slide_count": 8,
+  "source_bindings": {
+    "scripts/build_assessment_pptx.mjs": "ad81b46b544f24c043334d0e10f4dc96b2637a8c707a38958292a045d6a8a338",
+    "scripts/create_artifact_runtime_receipt.mjs": "1e7ab9c331d55bf05a08ac64d7df5d3ad047e0f219a4e6f3d299e6f15f79530d",
+    "scripts/create_pptx_montage.py": "124e8f446a1c03290b096de18bfe6dd20df8333a0b757747e870c7bca3154ff7",
+    "scripts/portable_fs.py": "03cd80720621e90b894d2fd9dc6abb586488fef3052d0504c5232c540f3f25ba",
+    "scripts/requirements.lock": "c5caf205040cf99d8fbb84673a00be227d0837b9e3e3b5dd8845afebda525473",
+    "scripts/secure_pptx_stage_bundle.py": "f0d3cb215e4c859fdcdd17402c88aa8b6c8aa559d3b5c3f99a3c8e477b7cf328",
+    "scripts/test_build_assessment_pptx.py": "1602a3805edc4ec53b0099bd217d7ebcd12c56e1dd66920a1c71f32377b64d49",
+    "scripts/validate_assessment_pptx.py": "8459ee23df55000ee517cddd543eb4253d753c2fae97371d23b8b6fc2cf8b756"
+  },
+  "status": "Passed",
+  "test": "test_builds_editable_pptx_with_sources_and_renders"
+}
