@@ -211,7 +211,7 @@ function validateModel(raw) {
   if (model.classification !== "PUBLIC") throw new ModelError("PowerPoint derivatives require PUBLIC classification");
   if (!DECISIONS.has(model.decision)) throw new ModelError("decision is invalid");
   if (!RATINGS.has(model.overall_residual_risk)) throw new ModelError("overall_residual_risk is invalid");
-  model.ide_scope = array(model.ide_scope, "ide_scope", 1, 4).map((item) => text(item, "ide_scope", { maxBytes: 128 }));
+  model.ide_scope = array(model.ide_scope, "ide_scope", 1, 4).map((item) => text(item, "ide_scope", { maxBytes: 160 }));
   model.executive_outcomes = array(model.executive_outcomes, "executive_outcomes", 5, 10).map((item) => text(item, "executive_outcomes", { maxBytes: 4096 }));
   model.approval_conditions = array(model.approval_conditions, "approval_conditions", 1, 20).map((item) => text(item, "approval_conditions", { maxBytes: 4096 }));
   const rawRevisions = Object.hasOwn(model, "revision_history")
