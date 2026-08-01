@@ -1,4 +1,4 @@
 interface:
   display_name: "MS-AI-IDE-Extension-Security-Assessment"
   short_description: "Produce evidence-led Microsoft IDE assessments"
-  default_prompt: "Use $ms-ai-ide-extension-security-assessment with default static, malware, and isolated runtime analysis to produce a fully validated authoritative Word assessment."
+  default_prompt: "Use $ms-ai-ide-extension-security-assessment with default static, malware, privacy, and isolated runtime analysis to produce a fully validated authoritative Word assessment through the supported Office artifact workflow."
