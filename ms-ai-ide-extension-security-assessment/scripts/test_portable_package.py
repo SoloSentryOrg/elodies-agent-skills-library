@@ -38,6 +38,8 @@ class PortablePackageTests(unittest.TestCase):
     def test_real_package_validates(self) -> None:
         manifest = validate_package(ROOT, "1.4.0")
         self.assertEqual(manifest["version"], "1.4.0")
+        paths = [entry["path"] for entry in manifest["files"]]
+        self.assertEqual(paths, sorted(paths, key=lambda item: (item.casefold(), item)))
 
     def test_complete_package_sync_is_atomic_and_recoverable(self) -> None:
         with tempfile.TemporaryDirectory() as directory:

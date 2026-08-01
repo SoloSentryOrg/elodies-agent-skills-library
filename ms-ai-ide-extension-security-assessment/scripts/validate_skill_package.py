@@ -81,7 +81,7 @@ def _sha256(path: Path) -> str:
 
 def package_files(root: Path) -> list[Path]:
     files: list[Path] = []
-    for path in sorted(root.rglob("*")):
+    for path in root.rglob("*"):
         relative = path.relative_to(root)
         if any(part in IGNORED_GENERATED_NAMES for part in relative.parts) or path.suffix == ".pyc":
             continue
@@ -98,6 +98,12 @@ def package_files(root: Path) -> list[Path]:
             raise PackageError(f"oversized package file: {relative}")
         if relative.as_posix() != MANIFEST_NAME:
             files.append(path)
+    files.sort(
+        key=lambda item: (
+            item.relative_to(root).as_posix().casefold(),
+            item.relative_to(root).as_posix(),
+        )
+    )
     return files
 
 

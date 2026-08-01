@@ -1,11 +1,6 @@
 {
   "files": [
     {
-      "path": "SKILL.md",
-      "sha256": "f54b132698f8d20eaf07c8bbf9086dda272a4f7942c87fb35d66703133f24400",
-      "size": 12683
-    },
-    {
       "path": "agents/openai.yaml",
       "sha256": "28ab31bfad22f67771b989200b4c8384231f7a1f9ef8aa3d3a08b8f00807f5f9",
       "size": 380
@@ -242,8 +237,8 @@
     },
     {
       "path": "scripts/test_portable_package.py",
-      "sha256": "5ad291496a299111f365c301bddcea4a1d54511f71e17f2bf7b62039a50709bf",
-      "size": 5899
+      "sha256": "f4b15e10f6630a8158a643c5bb3b0b5ae3512c63103494a281a7ceff407eebc3",
+      "size": 6051
     },
     {
       "path": "scripts/test_portable_security_contracts.py",
@@ -282,8 +277,13 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "bbe2f83343e46451d64ec0efb3949431506325715791eb5800a1b78bf45bae62",
-      "size": 8617
+      "sha256": "e2a3653a1043132b659ca328c0ce66f672a62088838233edf1c045a29dcef5b2",
+      "size": 8773
+    },
+    {
+      "path": "SKILL.md",
+      "sha256": "f54b132698f8d20eaf07c8bbf9086dda272a4f7942c87fb35d66703133f24400",
+      "size": 12683
     }
   ],
   "schema_version": 1,
