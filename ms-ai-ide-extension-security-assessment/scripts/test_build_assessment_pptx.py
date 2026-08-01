@@ -588,6 +588,16 @@ class AssessmentPptxTests(unittest.TestCase):
         ]
         model["approval_conditions"].append("Condition 5 must be verified before deployment. REF-005")
         model["derivative_sources"]["approval_conditions"].append(["EVD-TEST-005", "REF-005"])
+        model["figure"] = {
+            "title": "Synthetic trust boundaries",
+            "alt_text": "A six-node synthetic architecture exercises long same-row routing. REF-001",
+            "nodes": ["IDE host", "MCP client", "MCP service", "Local tools", "Remote service", "Third party"],
+            "edges": [
+                ["IDE host", "MCP client", "invokes"],
+                ["MCP client", "MCP service", "HTTPS"],
+                ["Local tools", "Third party", "bounded integration"],
+            ],
+        }
         self.write_model(model)
         word_args = self.write_word_closeout(model)
         runtime_temp = tempfile.TemporaryDirectory(dir=ROOT)
@@ -689,6 +699,20 @@ class AssessmentPptxTests(unittest.TestCase):
             self.assertIn(long_recommendation, all_slide_text)
             self.assertIn(model["assessment"], slide_text["ppt/slides/slide1.xml"])
             self.assertFalse(any("…" in value for value in all_slide_text))
+            architecture_name = next(
+                name for name, values in slide_text.items()
+                if "Synthetic trust boundaries" in values
+            )
+            architecture_document = ElementTree.fromstring(archive.read(architecture_name))
+            connector_geometries = [
+                element.attrib.get("prst", "")
+                for element in architecture_document.iter()
+                if element.tag.endswith("}prstGeom")
+            ]
+            self.assertTrue(
+                any(value.startswith("bentConnector") for value in connector_geometries),
+                connector_geometries,
+            )
         build_manifest = json.loads(manifest.read_text(encoding="utf-8"))
         self.assertEqual(build_manifest["native_powerpoint_closeout"], "Pending")
         self.assertEqual(build_manifest["output"]["slide_count"], summary["slide_count"])

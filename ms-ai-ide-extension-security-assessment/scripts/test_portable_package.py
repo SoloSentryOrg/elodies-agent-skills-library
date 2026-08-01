@@ -25,7 +25,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class PortablePackageTests(unittest.TestCase):
     def release_evidence(self, parent: Path) -> tuple[Path, Path]:
-        archive = parent / "assessment-skill-1.4.3.zip"
+        archive = parent / "assessment-skill-1.4.4.zip"
         create_archive(ROOT, archive)
         release_manifest = parent / "release-manifest.json"
         payload = _create_release_manifest_payload(ROOT, archive, "a" * 40)
@@ -36,8 +36,8 @@ class PortablePackageTests(unittest.TestCase):
         return archive, release_manifest
 
     def test_real_package_validates(self) -> None:
-        manifest = validate_package(ROOT, "1.4.3")
-        self.assertEqual(manifest["version"], "1.4.3")
+        manifest = validate_package(ROOT, "1.4.4")
+        self.assertEqual(manifest["version"], "1.4.4")
         paths = [entry["path"] for entry in manifest["files"]]
         self.assertEqual(paths, sorted(paths, key=lambda item: (item.casefold(), item)))
 
@@ -53,14 +53,14 @@ class PortablePackageTests(unittest.TestCase):
                 [destination],
                 release_manifest,
                 archive,
-                "1.4.3",
+                "1.4.4",
                 "a" * 40,
             )
             self.assertEqual(len(result), 1)
             self.assertTrue((destination / "SKILL.md").is_file())
             backup = Path(str(result[0]["backup"]))
             self.assertEqual((backup / "prior.txt").read_text(encoding="utf-8"), "prior\n")
-            validate_package(destination, "1.4.3")
+            validate_package(destination, "1.4.4")
             environment = {
                 key: value
                 for key, value in os.environ.items()
@@ -97,7 +97,7 @@ class PortablePackageTests(unittest.TestCase):
                     [root / "wrong"],
                     release_manifest,
                     archive,
-                    "1.4.3",
+                    "1.4.4",
                     "a" * 40,
                 )
 
@@ -112,7 +112,7 @@ class PortablePackageTests(unittest.TestCase):
             with zipfile.ZipFile(buffer, "w", zipfile.ZIP_DEFLATED) as modified:
                 for entry, data in members:
                     modified.writestr(entry.filename, data + (b"x" if entry.filename == first.filename else b""))
-            package = validate_package(ROOT, "1.4.3")
+            package = validate_package(ROOT, "1.4.4")
             with self.assertRaisesRegex(ReleaseManifestError, "size differs"):
                 _validate_archive(buffer.getvalue(), ROOT, package)
 
