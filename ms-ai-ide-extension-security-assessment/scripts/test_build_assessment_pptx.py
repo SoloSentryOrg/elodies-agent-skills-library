@@ -704,14 +704,22 @@ class AssessmentPptxTests(unittest.TestCase):
                 if "Synthetic trust boundaries" in values
             )
             architecture_document = ElementTree.fromstring(archive.read(architecture_name))
-            connector_geometries = [
-                element.attrib.get("prst", "")
+            architecture_shape_names = [
+                element.attrib.get("name", "")
                 for element in architecture_document.iter()
-                if element.tag.endswith("}prstGeom")
+                if element.tag.endswith("}cNvPr")
             ]
-            self.assertTrue(
-                any(value.startswith("bentConnector") for value in connector_geometries),
-                connector_geometries,
+            self.assertEqual(
+                {
+                    "architecture-spanning-edge-2-source",
+                    "architecture-spanning-edge-2-route",
+                    "architecture-spanning-edge-2-target",
+                    "architecture-spanning-edge-2-arrow",
+                },
+                {
+                    name for name in architecture_shape_names
+                    if name.startswith("architecture-spanning-edge-2-")
+                },
             )
         build_manifest = json.loads(manifest.read_text(encoding="utf-8"))
         self.assertEqual(build_manifest["native_powerpoint_closeout"], "Pending")
