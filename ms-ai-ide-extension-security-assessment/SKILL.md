@@ -2,7 +2,7 @@
 name: ms-ai-ide-extension-security-assessment
 description: Research and assess AI-related Visual Studio and VS Code extensions, MCP integrations, and installed Agent Skills using a repeatable, evidence-led security methodology. Use when Codex must produce or update a professional Microsoft Word extension assessment, installation manifest, OWASP/agentic/financial-sector mapping, risk register, diagrams, SBOM-style inventory, Markdown report, or concise executive derivative.
 metadata:
-  version: "1.4.5"
+  version: "1.4.6"
 ---
 
 # Assess Microsoft IDE AI Extensions

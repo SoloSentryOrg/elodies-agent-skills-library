@@ -1,0 +1,34 @@
+{
+  "schema_version": 1,
+  "policy_id": "authoritative-report-default",
+  "cover": {
+    "classification_location": "header_only",
+    "header_identity": "assessment_name",
+    "extension_id_location": "body_only"
+  },
+  "contents": {
+    "kind": "native_word_toc",
+    "heading_levels": "1-3",
+    "hyperlinks": true,
+    "page_numbers": true,
+    "manual_entries": false
+  },
+  "figure": {
+    "connector_routing": "node_boundary",
+    "arrowheads": true,
+    "label_backplates": true
+  },
+  "tables": {
+    "minimum_column_width_twips": {
+      "Accessed": 1260,
+      "State": 1080
+    },
+    "no_wrap_headers": [
+      "Accessed",
+      "State"
+    ],
+    "no_wrap_columns": [
+      "Accessed"
+    ]
+  }
+}

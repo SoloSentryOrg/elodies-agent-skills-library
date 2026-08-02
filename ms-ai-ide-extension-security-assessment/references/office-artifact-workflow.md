@@ -32,6 +32,12 @@ source.
 2. Prefer a repository-approved template. Otherwise select and apply the
    document skill's business-report design preset with explicit page, style,
    list, table, header, footer, caption, and color tokens.
+   Feed the shared builder a validated persisted layout policy. The packaged
+   `templates/authoritative-report-layout.json` is the default and must keep
+   classification in the header only, the extension identifier out of the
+   header, contents as a native Word TOC with hyperlinks and page numbers,
+   connectors clear of figure nodes and labels, and short semantic table
+   columns wide enough to avoid unnecessary word wrapping.
 3. Use the document skill's reusable helpers for table geometry, fields,
    captions, internal navigation, accessibility, and privacy. Do not copy
    generic formatting or OOXML plumbing into each assessment-specific builder.

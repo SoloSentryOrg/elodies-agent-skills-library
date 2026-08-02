@@ -42,8 +42,8 @@
     },
     {
       "path": "references/office-artifact-workflow.md",
-      "sha256": "a888c1f8356a5b617a31bf95b58432170e804e8a2737208284c75243caf867e6",
-      "size": 4818
+      "sha256": "5edb26ada05278cad09156e6e9b2dd36b5f3a188fe776d2311c8aafa3aae3ae9",
+      "size": 5253
     },
     {
       "path": "references/portable-execution.md",
@@ -102,8 +102,8 @@
     },
     {
       "path": "scripts/build_assessment_docx.py",
-      "sha256": "4123bbe78431fffeeaa2429e1462d3fc667a8aabdf93ef60f1770bfd756b8618",
-      "size": 56900
+      "sha256": "e04de95d5c0d46cffaea5594efaf82627529f6f8dbd7746ef0400311e234939b",
+      "size": 67141
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
@@ -167,13 +167,13 @@
     },
     {
       "path": "scripts/render_reports_with_word.applescript",
-      "sha256": "51dbd904faa0710de431ad5c76410d87d55e2e21504dc2dfea47f59eabe5a2c2",
-      "size": 9249
+      "sha256": "6b7ea1d1437ab97a8bb4d2013a5f2e8bf575b41b95bf140027baa74611ddd839",
+      "size": 9509
     },
     {
       "path": "scripts/render_reports_with_word.ps1",
-      "sha256": "b39cae88df79a00b93c8a81df9f936b7bc35c33bfc5fc068d7a2463a5839aefd",
-      "size": 2666
+      "sha256": "6d0a6a68c1e6b963e78544329bb724c3ef629d9ec1231986be72e2c8add15382",
+      "size": 3280
     },
     {
       "path": "scripts/requirements.in",
@@ -212,8 +212,8 @@
     },
     {
       "path": "scripts/test_build_assessment_docx.py",
-      "sha256": "e037f1bc80f5547ba007374cdeef7d7831792d89c45aa6549f80beecdfb096ed",
-      "size": 19405
+      "sha256": "e96bb468f74c7b322b0c8b86498a4fcf27fa546b13e1b25dac895968f23c5af7",
+      "size": 23139
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
@@ -237,13 +237,13 @@
     },
     {
       "path": "scripts/test_portable_package.py",
-      "sha256": "461362a506c426a00badc3f0308cfad4ec8521b294694a2ada5f6987657e19fa",
+      "sha256": "866484fd952ad5d47396c7e77bef7d0526e9b5a05ef18ba0ef2c57ea6df0b9cb",
       "size": 6051
     },
     {
       "path": "scripts/test_portable_security_contracts.py",
-      "sha256": "27f85fe74add96bf9c3b3e8c44e127245ab74712224648cd8491e197593666df",
-      "size": 10995
+      "sha256": "8ec58e8e4d82a17467ba06a1a97910be2777ff14f692a96e301a5a02d7689990",
+      "size": 11586
     },
     {
       "path": "scripts/test_validate_assessment_layout.py",
@@ -267,8 +267,8 @@
     },
     {
       "path": "scripts/validate_assessment_report.py",
-      "sha256": "aea30e3edd04faebcef0cd953399b5973fdd0c6945cc0d26eb8d81b2a8d3b72b",
-      "size": 26847
+      "sha256": "985344765759df380494aabba1d0d2aabce4bafc35b17718652bb78002fae09e",
+      "size": 27087
     },
     {
       "path": "scripts/validate_pptx_runtime_acceptance.py",
@@ -277,20 +277,25 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "21cca8f63c2f23e08a58fda39ff6ab3e19b6e00888a055a1a6b23b78ac5214e3",
-      "size": 8773
+      "sha256": "62fd040fd0255763a0ec90443ee67c585de48e6c3602228c966c7738bef2ac61",
+      "size": 8823
     },
     {
       "path": "SKILL.md",
-      "sha256": "7e530843bf43b059ec0c5089670829ce286995d56440698f0745bbfa3934fed8",
+      "sha256": "427f40c526d3a21b8e989b25875e1d497a517085e715c37fe5a8e9a563bfd0ad",
       "size": 12683
+    },
+    {
+      "path": "templates/authoritative-report-layout.json",
+      "sha256": "9e1c7f0edfd192ca10ff70f4724eee48bd3f31c98f269d4e9e55d9d8197ac22c",
+      "size": 711
     }
   ],
   "schema_version": 1,
   "skill": "ms-ai-ide-extension-security-assessment",
   "source": {
-    "ref": "ms-ai-ide-extension-security-assessment-v1.4.5",
+    "ref": "ms-ai-ide-extension-security-assessment-v1.4.6",
     "repository": "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
   },
-  "version": "1.4.5"
+  "version": "1.4.6"
 }
