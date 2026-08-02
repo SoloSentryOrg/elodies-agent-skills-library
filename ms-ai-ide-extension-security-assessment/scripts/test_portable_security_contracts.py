@@ -67,6 +67,15 @@ def _pptx_external_relationship(path: Path, target_mode: str) -> None:
 
 
 class PortableSecurityContractTests(unittest.TestCase):
+    def test_word_adapters_refresh_native_toc_before_render(self) -> None:
+        script_root = Path(__file__).resolve().parent
+        applescript = (script_root / "render_reports_with_word.applescript").read_text(encoding="utf-8")
+        powershell = (script_root / "render_reports_with_word.ps1").read_text(encoding="utf-8")
+        self.assertIn("update reportTOC", applescript)
+        self.assertIn("update page numbers reportTOC", applescript)
+        self.assertIn("$tableOfContents.Update()", powershell)
+        self.assertIn("$tableOfContents.UpdatePageNumbers()", powershell)
+
     def test_public_https_rejects_legacy_numeric_loopback(self) -> None:
         for target in ("https://2130706433/private", "https://0x7f000001/private", "https://017700000001/private"):
             with self.subTest(target=target):

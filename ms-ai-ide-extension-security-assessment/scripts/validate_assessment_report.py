@@ -455,6 +455,11 @@ def validate_report(path: Path) -> ValidationResult:
             paragraphs = _paragraphs(document)
             headings = [item for item in paragraphs if item.style.casefold().startswith("heading") and item.text]
             heading_text = [normalize(item.text) for item in headings]
+            required_heading_text = heading_text + [
+                normalize(item.text)
+                for item in paragraphs
+                if item.style.casefold().replace(" ", "") == "tocheading" and item.text
+            ]
             full_text = " ".join(
                 (node.text or "").strip()
                 for node in document.iter(f"{{{W}}}t")
@@ -536,7 +541,7 @@ def validate_report(path: Path) -> ValidationResult:
 
             for label, alternatives in REQUIRED_HEADING_GROUPS:
                 normalized_alternatives = tuple(normalize(item) for item in alternatives)
-                if not any(any(candidate in heading for candidate in normalized_alternatives) for heading in heading_text):
+                if not any(any(candidate in heading for candidate in normalized_alternatives) for heading in required_heading_text):
                     failures.append(f"missing required heading: {label}")
 
             vscode = _part_text(paragraphs, ("part i vs code", "vs code assessment"), ("part ii visual studio", "visual studio assessment"))

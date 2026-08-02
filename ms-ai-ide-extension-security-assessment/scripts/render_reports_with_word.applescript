@@ -149,6 +149,11 @@ on run argv
                         end if
                     end repeat
                     if my openedDocument is missing value then error "Word did not expose the unique staged QA document"
+                    set reportTOCs to tables of contents of my openedDocument
+                    repeat with reportTOC in reportTOCs
+                        update reportTOC
+                        update page numbers reportTOC
+                    end repeat
                     set reportPages to compute statistics (my openedDocument) statistic statistic pages
                     save as my openedDocument file name temporaryOutput file format format PDF
                     do shell script "/bin/test -s " & quoted form of temporaryOutput

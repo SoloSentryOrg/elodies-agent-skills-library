@@ -9,6 +9,7 @@ import hashlib
 import importlib.metadata
 import ipaddress
 import json
+import math
 import os
 import re
 import socket
@@ -28,7 +29,7 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from docx.oxml import OxmlElement
 from docx.oxml.ns import qn
 from docx.shared import Inches, Pt, RGBColor
-from portable_fs import is_link_or_reparse, require_real_directory
+from portable_fs import bounded_read, is_link_or_reparse, require_real_directory
 from PIL import Image, ImageDraw, ImageFont
 from safe_stage_inputs import consume_validated_stages, read_bounded_regular_file
 
@@ -39,6 +40,7 @@ EVIDENCE_ID = re.compile(r"^EVD-[A-Z0-9-]{3,64}$")
 FINDING_ID = re.compile(r"^(?:F|RISK)-\d{3}$")
 CITATION = re.compile(r"\bREF-(\d{3})\b")
 MAX_MODEL_BYTES = 4 * 1024 * 1024
+MAX_LAYOUT_POLICY_BYTES = 64 * 1024
 MAX_STRING_BYTES = 64 * 1024
 MAX_ITEMS = 500
 PUBLIC_HOST_SUFFIXES_DENY = (".internal", ".local", ".localhost")
@@ -57,6 +59,11 @@ DECISIONS = {
 }
 RATINGS = {"Low", "Moderate", "High", "Critical"}
 W = "http://schemas.openxmlformats.org/wordprocessingml/2006/main"
+DEFAULT_LAYOUT_POLICY = (
+    Path(__file__).resolve().parent.parent
+    / "templates"
+    / "authoritative-report-layout.json"
+)
 
 
 class ModelError(ValueError):
@@ -64,6 +71,72 @@ class ModelError(ValueError):
 
 
 FileIdentity = tuple[int, int]
+
+
+def validate_layout_policy(raw: object) -> dict[str, object]:
+    """Validate the persisted report-layout contract without permissive defaults."""
+
+    if not isinstance(raw, dict) or set(raw) != {
+        "schema_version",
+        "policy_id",
+        "cover",
+        "contents",
+        "figure",
+        "tables",
+    }:
+        raise ModelError("layout policy has missing or unexpected fields")
+    if raw["schema_version"] != 1 or raw["policy_id"] != "authoritative-report-default":
+        raise ModelError("layout policy identity is unsupported")
+    cover = raw["cover"]
+    if not isinstance(cover, dict) or cover != {
+        "classification_location": "header_only",
+        "header_identity": "assessment_name",
+        "extension_id_location": "body_only",
+    }:
+        raise ModelError("layout policy cover rules are invalid")
+    contents = raw["contents"]
+    if not isinstance(contents, dict) or contents != {
+        "kind": "native_word_toc",
+        "heading_levels": "1-3",
+        "hyperlinks": True,
+        "page_numbers": True,
+        "manual_entries": False,
+    }:
+        raise ModelError("layout policy contents rules are invalid")
+    figure = raw["figure"]
+    if not isinstance(figure, dict) or figure != {
+        "connector_routing": "node_boundary",
+        "arrowheads": True,
+        "label_backplates": True,
+    }:
+        raise ModelError("layout policy figure rules are invalid")
+    tables = raw["tables"]
+    if not isinstance(tables, dict) or set(tables) != {
+        "minimum_column_width_twips",
+        "no_wrap_headers",
+        "no_wrap_columns",
+    }:
+        raise ModelError("layout policy table rules are invalid")
+    minimums = tables["minimum_column_width_twips"]
+    if not isinstance(minimums, dict) or set(minimums) != {"Accessed", "State"}:
+        raise ModelError("layout policy semantic column widths are invalid")
+    for heading, value in minimums.items():
+        if not isinstance(value, int) or isinstance(value, bool) or not 720 <= value <= 2400:
+            raise ModelError(f"layout policy width is invalid for {heading}")
+    no_wrap_headers = tables["no_wrap_headers"]
+    no_wrap_columns = tables["no_wrap_columns"]
+    if no_wrap_headers != ["Accessed", "State"] or no_wrap_columns != ["Accessed"]:
+        raise ModelError("layout policy wrapping rules are invalid")
+    return raw
+
+
+def load_layout_policy(path: Path = DEFAULT_LAYOUT_POLICY) -> tuple[dict[str, object], str]:
+    try:
+        data, _ = bounded_read(path, MAX_LAYOUT_POLICY_BYTES)
+        raw = json.loads(data.decode("utf-8", errors="strict"))
+    except (OSError, ValueError, UnicodeError, json.JSONDecodeError) as exc:
+        raise ModelError(f"cannot read validated layout policy: {path}") from exc
+    return validate_layout_policy(raw), hashlib.sha256(data).hexdigest()
 
 
 def _identity(metadata: os.stat_result) -> FileIdentity:
@@ -636,17 +709,34 @@ def _set_table_geometry(table, widths: list[int]) -> None:
             _set_cell_margins(cell)
 
 
-def _column_widths(columns: list[str], rows: list[list[str]]) -> list[int]:
+def _column_widths(
+    columns: list[str],
+    rows: list[list[str]],
+    layout_policy: dict[str, object],
+) -> list[int]:
     weights = []
     for index, heading in enumerate(columns):
         longest = max([len(heading)] + [min(len(row[index]), 240) for row in rows])
         weights.append(max(8, min(longest, 80)))
+    table_rules = layout_policy["tables"]
+    assert isinstance(table_rules, dict)
+    semantic_minimums = table_rules["minimum_column_width_twips"]
+    assert isinstance(semantic_minimums, dict)
+    minimums = [max(720, int(semantic_minimums.get(heading, 720))) for heading in columns]
+    minimum_total = sum(minimums)
+    if minimum_total > 9360:
+        raise ModelError("layout policy minimum column widths exceed the table width")
+    distributable = 9360 - minimum_total
     total = sum(weights)
-    raw = [max(720, round(9360 * weight / total)) for weight in weights]
-    scale = 9360 / sum(raw)
-    result = [round(value * scale) for value in raw]
+    result = [minimum + round(distributable * weight / total) for minimum, weight in zip(minimums, weights)]
     result[-1] += 9360 - sum(result)
     return result
+
+
+def _set_no_wrap(cell) -> None:
+    tc_pr = cell._tc.get_or_add_tcPr()
+    if tc_pr.first_child_found_in("w:noWrap") is None:
+        tc_pr.append(OxmlElement("w:noWrap"))
 
 
 def _shade_cell(cell, fill: str) -> None:
@@ -752,7 +842,15 @@ def _add_cited_text(paragraph, value: str) -> None:
         paragraph.add_run(value[cursor:])
 
 
-def _add_table(doc: Document, title: str, columns: list[str], rows: list[list[str]], *, compact: bool = False) -> None:
+def _add_table(
+    doc: Document,
+    title: str,
+    columns: list[str],
+    rows: list[list[str]],
+    layout_policy: dict[str, object],
+    *,
+    compact: bool = False,
+) -> None:
     caption = doc.add_paragraph(style="Caption")
     caption.add_run(title).bold = True
     table = doc.add_table(rows=1, cols=len(columns))
@@ -776,7 +874,17 @@ def _add_table(doc: Document, title: str, columns: list[str], rows: list[list[st
             _add_cited_text(paragraph, value)
             for run in paragraph.runs:
                 run.font.size = Pt(8)
-    _set_table_geometry(table, _column_widths(columns, rows))
+    _set_table_geometry(table, _column_widths(columns, rows, layout_policy))
+    table_rules = layout_policy["tables"]
+    assert isinstance(table_rules, dict)
+    no_wrap_headers = set(table_rules["no_wrap_headers"])
+    no_wrap_columns = set(table_rules["no_wrap_columns"])
+    for index, heading in enumerate(columns):
+        if heading in no_wrap_headers:
+            _set_no_wrap(table.rows[0].cells[index])
+        if heading in no_wrap_columns:
+            for row in table.rows[1:]:
+                _set_no_wrap(row.cells[index])
     if compact:
         for row in table.rows:
             for cell in row.cells:
@@ -787,7 +895,11 @@ def _add_table(doc: Document, title: str, columns: list[str], rows: list[list[st
     doc.add_paragraph()
 
 
-def _configure_document(doc: Document, model: dict[str, object]) -> None:
+def _configure_document(
+    doc: Document,
+    model: dict[str, object],
+    layout_policy: dict[str, object],
+) -> None:
     section = doc.sections[0]
     section.page_width = Inches(8.5)
     section.page_height = Inches(11)
@@ -818,11 +930,11 @@ def _configure_document(doc: Document, model: dict[str, object]) -> None:
         style.paragraph_format.keep_with_next = True
 
     header = section.header.paragraphs[0]
-    header.text = f"{model['target']} | Security assessment | Classification: PUBLIC"
+    header.text = f"{model['assessment']} | Security assessment | Classification: PUBLIC"
     header.style = styles["Header"]
     footer = section.footer.paragraphs[0]
     footer.alignment = WD_ALIGN_PARAGRAPH.RIGHT
-    footer.add_run("PUBLIC | Page ")
+    footer.add_run("Page ")
     _complex_field(footer, "PAGE")
 
     properties = doc.core_properties
@@ -833,18 +945,99 @@ def _configure_document(doc: Document, model: dict[str, object]) -> None:
     properties.keywords = "security assessment, VS Code, AI, OWASP, privacy"
     properties.comments = "Generated from hash-bound validated stage outputs."
 
+    settings = doc.settings._element
+    update_fields = settings.find(qn("w:updateFields"))
+    if update_fields is None:
+        update_fields = OxmlElement("w:updateFields")
+        settings.append(update_fields)
+    update_fields.set(qn("w:val"), "true")
+
+
+def _box_center(box: tuple[int, int, int, int]) -> tuple[int, int]:
+    return (box[0] + box[2]) // 2, (box[1] + box[3]) // 2
+
+
+def _boundary_point(
+    box: tuple[int, int, int, int],
+    toward: tuple[int, int],
+) -> tuple[int, int]:
+    center = _box_center(box)
+    dx, dy = toward[0] - center[0], toward[1] - center[1]
+    if dx == 0 and dy == 0:
+        return center
+    half_width = (box[2] - box[0]) / 2
+    half_height = (box[3] - box[1]) / 2
+    scale = min(
+        half_width / abs(dx) if dx else float("inf"),
+        half_height / abs(dy) if dy else float("inf"),
+    )
+    return round(center[0] + dx * scale), round(center[1] + dy * scale)
+
+
+def _route_connector(
+    source_box: tuple[int, int, int, int],
+    target_box: tuple[int, int, int, int],
+    source_index: int,
+    target_index: int,
+    columns: int,
+) -> list[tuple[int, int]]:
+    """Route connectors between node boundaries without traversing node boxes."""
+
+    source_row, source_column = divmod(source_index, columns)
+    target_row, target_column = divmod(target_index, columns)
+    source_center = _box_center(source_box)
+    target_center = _box_center(target_box)
+    if source_row == target_row and abs(source_column - target_column) == 1:
+        return [
+            _boundary_point(source_box, target_center),
+            _boundary_point(target_box, source_center),
+        ]
+    if source_column == target_column and abs(source_row - target_row) == 1:
+        return [
+            _boundary_point(source_box, target_center),
+            _boundary_point(target_box, source_center),
+        ]
+    if source_row != target_row:
+        corridor_y = (min(source_box[3], target_box[3]) + max(source_box[1], target_box[1])) // 2
+        source_exit = (source_center[0], source_box[3] if source_row < target_row else source_box[1])
+        target_entry = (target_center[0], target_box[1] if source_row < target_row else target_box[3])
+        return [source_exit, (source_exit[0], corridor_y), (target_entry[0], corridor_y), target_entry]
+    corridor_y = 135 if source_row == 0 else max(source_box[3], target_box[3]) + 85
+    source_exit = (source_center[0], source_box[1] if source_row == 0 else source_box[3])
+    target_entry = (target_center[0], target_box[1] if target_row == 0 else target_box[3])
+    return [source_exit, (source_exit[0], corridor_y), (target_entry[0], corridor_y), target_entry]
+
+
+def _draw_arrowhead(draw: ImageDraw.ImageDraw, start: tuple[int, int], end: tuple[int, int]) -> None:
+    angle = math.atan2(end[1] - start[1], end[0] - start[0])
+    length = 22
+    spread = math.pi / 7
+    points = [
+        end,
+        (
+            round(end[0] - length * math.cos(angle - spread)),
+            round(end[1] - length * math.sin(angle - spread)),
+        ),
+        (
+            round(end[0] - length * math.cos(angle + spread)),
+            round(end[1] - length * math.sin(angle + spread)),
+        ),
+    ]
+    draw.polygon(points, fill="#49677F")
+
 
 def _draw_figure(
     model: dict[str, object],
     output: Path,
     output_identity: FileIdentity,
+    layout_policy: dict[str, object],
 ) -> None:
     figure = model["figure"]
     assert isinstance(figure, dict)
     nodes = figure["nodes"]
     edges = figure["edges"]
     assert isinstance(nodes, list) and isinstance(edges, list)
-    canvas = Image.new("RGB", (1800, 900), "white")
+    canvas = Image.new("RGB", (1800, 1100), "white")
     draw = ImageDraw.Draw(canvas)
     try:
         title_font = ImageFont.truetype("/System/Library/Fonts/Supplemental/Arial Bold.ttf", 40)
@@ -861,14 +1054,40 @@ def _draw_figure(
         x = 80 + column * 420
         y = 180 + row * 300
         positions[str(node)] = (x, y, x + box_width, y + box_height)
-    for source, target, label in edges:
+    index_by_node = {str(node): index for index, node in enumerate(nodes)}
+    legend_entries: list[tuple[int, str]] = []
+    for edge_number, (source, target, label) in enumerate(edges, 1):
         source_box = positions[str(source)]
         target_box = positions[str(target)]
-        start = ((source_box[0] + source_box[2]) // 2, (source_box[1] + source_box[3]) // 2)
-        end = ((target_box[0] + target_box[2]) // 2, (target_box[1] + target_box[3]) // 2)
-        draw.line((start, end), fill="#49677F", width=5)
-        midpoint = ((start[0] + end[0]) // 2, (start[1] + end[1]) // 2)
-        draw.text((midpoint[0] + 8, midpoint[1] - 30), str(label)[:34], fill="#49677F", font=small_font)
+        points = _route_connector(
+            source_box,
+            target_box,
+            index_by_node[str(source)],
+            index_by_node[str(target)],
+            columns,
+        )
+        draw.line(points, fill="#49677F", width=5, joint="curve")
+        _draw_arrowhead(draw, points[-2], points[-1])
+        segments = list(zip(points, points[1:]))
+        label_start, label_end = max(
+            segments,
+            key=lambda segment: abs(segment[1][0] - segment[0][0]) + abs(segment[1][1] - segment[0][1]),
+        )
+        midpoint = ((label_start[0] + label_end[0]) // 2, (label_start[1] + label_end[1]) // 2)
+        marker_box = (midpoint[0] - 20, midpoint[1] - 20, midpoint[0] + 20, midpoint[1] + 20)
+        draw.ellipse(marker_box, fill="white", outline="#49677F", width=3)
+        marker_text = str(edge_number)
+        marker_text_box = draw.textbbox((0, 0), marker_text, font=small_font)
+        draw.text(
+            (
+                midpoint[0] - (marker_text_box[2] - marker_text_box[0]) // 2,
+                midpoint[1] - (marker_text_box[3] - marker_text_box[1]) // 2 - marker_text_box[1],
+            ),
+            marker_text,
+            fill="#0B2545",
+            font=small_font,
+        )
+        legend_entries.append((edge_number, str(label)))
     for node, box in positions.items():
         draw.rounded_rectangle(box, radius=18, fill="#E8EEF5", outline="#2E74B5", width=4)
         words = node.split()
@@ -888,6 +1107,23 @@ def _draw_figure(
             bbox = draw.textbbox((0, 0), line, font=body_font)
             draw.text((box[0] + (box_width - (bbox[2] - bbox[0])) // 2, y), line, fill="#0B2545", font=body_font)
             y += 38
+    legend_top = 720
+    draw.text((80, legend_top - 50), "Data-flow legend", fill="#0B2545", font=body_font)
+    legend_columns = 2
+    legend_width = 820
+    for index, (edge_number, label) in enumerate(legend_entries):
+        row, column = divmod(index, legend_columns)
+        x = 80 + column * 860
+        y = legend_top + row * 58
+        draw.rounded_rectangle((x, y, x + 42, y + 42), radius=12, fill="#E8EEF5", outline="#2E74B5", width=2)
+        number_box = draw.textbbox((0, 0), str(edge_number), font=small_font)
+        draw.text(
+            (x + 21 - (number_box[2] - number_box[0]) // 2, y + 21 - (number_box[3] - number_box[1]) // 2 - number_box[1]),
+            str(edge_number),
+            fill="#0B2545",
+            font=small_font,
+        )
+        draw.text((x + 56, y + 7), label[:48], fill="#49677F", font=small_font)
     with _open_owned_file(
         output,
         output_identity,
@@ -920,13 +1156,14 @@ def _assert_contents_starts_on_fresh_page(doc: Document) -> None:
 
 def _build_report_owned(
     model: dict[str, object],
+    layout_policy: dict[str, object],
     output: Path,
     figure_path: Path,
     output_identity: FileIdentity,
     figure_identity: FileIdentity,
 ) -> None:
     doc = Document()
-    _configure_document(doc, model)
+    _configure_document(doc, model, layout_policy)
 
     title = doc.add_paragraph()
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
@@ -937,10 +1174,6 @@ def _build_report_owned(
     subtitle = doc.add_paragraph()
     subtitle.alignment = WD_ALIGN_PARAGRAPH.CENTER
     subtitle.add_run("Microsoft IDE AI Extension Security Assessment").italic = True
-    classification = doc.add_paragraph()
-    classification.alignment = WD_ALIGN_PARAGRAPH.CENTER
-    classification.add_run("Classification: PUBLIC").bold = True
-
     doc.add_heading("Document Control", level=1)
     _add_table(doc, "Table 1 — Document control", ["Field", "Value"], [
         ["Assessment", str(model["assessment"])],
@@ -949,10 +1182,9 @@ def _build_report_owned(
         ["Extension ID", str(model["extension_id"])],
         ["Version", str(model["version"])],
         ["Run key", str(model["run_key"])],
-        ["Classification", "PUBLIC"],
         ["Distribution", "Public distribution"],
         ["Decision", str(model["decision"])],
-    ])
+    ], layout_policy)
     doc.add_heading("Revision History", level=1)
     _add_table(
         doc,
@@ -967,22 +1199,17 @@ def _build_report_owned(
             ]
             for item in model["revision_history"]
         ],
+        layout_policy,
     )
     # Contents is a navigation surface, not trailing front matter. A mandatory
     # page break prevents it from ever beginning in the lower half of a page.
     doc.add_page_break()
-    doc.add_heading("Contents", level=1)
+    doc.add_paragraph("Contents", style="TOC Heading")
     toc = doc.add_paragraph()
     field = OxmlElement("w:fldSimple")
     field.set(qn("w:instr"), 'TOC \\o "1-3" \\h \\z \\u')
+    field.set(qn("w:dirty"), "true")
     toc._p.append(field)
-    for section in model["sections"]:
-        assert isinstance(section, dict)
-        item = doc.add_paragraph(style="List Bullet")
-        item.paragraph_format.space_before = Pt(0)
-        item.paragraph_format.space_after = Pt(0)
-        item.paragraph_format.line_spacing = 1.0
-        item.add_run(str(section["heading"])).font.size = Pt(9)
 
     doc.add_section(WD_SECTION.NEW_PAGE)
     doc.add_heading("Executive Summary", level=1)
@@ -997,7 +1224,7 @@ def _build_report_owned(
         _add_cited_text(paragraph, str(condition))
 
     doc.add_heading("Architecture and Trust-Boundary Figure", level=2)
-    _draw_figure(model, figure_path, figure_identity)
+    _draw_figure(model, figure_path, figure_identity, layout_policy)
     paragraph = doc.add_paragraph()
     with _open_owned_file(
         figure_path,
@@ -1029,7 +1256,7 @@ def _build_report_owned(
             _add_cited_text(paragraph, str(value))
         for table in section["tables"]:
             assert isinstance(table, dict)
-            _add_table(doc, str(table["title"]), list(table["columns"]), list(table["rows"]))
+            _add_table(doc, str(table["title"]), list(table["columns"]), list(table["rows"]), layout_policy)
 
     doc.add_heading("Individual Finding Records", level=1)
     for finding in model["findings"]:
@@ -1037,14 +1264,14 @@ def _build_report_owned(
         doc.add_heading(f"{finding['id']} — {finding['title']}", level=2)
         _add_table(doc, f"Finding record — {finding['id']}", ["Field", "Assessment"], [[field.replace("_", " ").title(), str(finding[field])] for field in (
             "scope", "scenario", "evidence_ids", "likelihood", "impact", "inherent", "controls", "control_strength", "residual_likelihood", "residual_impact", "residual", "recommendation", "owner", "priority", "target_date", "verification", "mappings", "confidence"
-        )])
+        )], layout_policy)
 
     doc.add_heading("Consolidated Risk Register", level=1)
     doc.add_paragraph("Legend: ID is the finding identifier; L and I are inherent likelihood and impact scored 1–5; Inherent is L × I; rL and rI are residual likelihood and impact after verified controls; Residual is rL × rI; rating bands are 1–4 Low, 5–9 Moderate, 10–16 High, and 17–25 Critical. Treatment is the required action and Owner is accountable for verification.")
-    _add_table(doc, "Consolidated risk register", ["ID", "Risk", "Scope", "L/I", "Inherent", "rL/rI", "Residual", "Treatment", "Owner"], [[str(item["id"]), str(item["title"]), str(item["scope"]), f"{item['likelihood']}/{item['impact']}", str(item["inherent"]), f"{item['residual_likelihood']}/{item['residual_impact']}", str(item["residual"]), str(item["recommendation"]), str(item["owner"])] for item in model["findings"]])
+    _add_table(doc, "Consolidated risk register", ["ID", "Risk", "Scope", "L/I", "Inherent", "rL/rI", "Residual", "Treatment", "Owner"], [[str(item["id"]), str(item["title"]), str(item["scope"]), f"{item['likelihood']}/{item['impact']}", str(item["inherent"]), f"{item['residual_likelihood']}/{item['residual_impact']}", str(item["residual"]), str(item["recommendation"]), str(item["owner"])] for item in model["findings"]], layout_policy)
 
     doc.add_heading("Evidence Register", level=1)
-    _add_table(doc, "Evidence register", ["ID", "Evidence", "Source", "Method", "State", "Limitation"], [[str(item[field]) for field in ("id", "title", "source", "method", "state", "limitation")] for item in model["evidence"]])
+    _add_table(doc, "Evidence register", ["ID", "Evidence", "Source", "Method", "State", "Limitation"], [[str(item[field]) for field in ("id", "title", "source", "method", "state", "limitation")] for item in model["evidence"]], layout_policy)
 
     doc.add_heading("References", level=1)
     reference_table = doc.add_table(rows=1, cols=6)
@@ -1071,7 +1298,12 @@ def _build_report_owned(
             for run in cell.paragraphs[0].runs:
                 run.font.size = Pt(8)
         reference_rows.append([str(item[field]) for field in ("id", "title", "publisher", "url", "accessed", "applicability")])
-    _set_table_geometry(reference_table, _column_widths(["ID", "Title", "Publisher", "Source", "Accessed", "Applicability"], reference_rows))
+    reference_columns = ["ID", "Title", "Publisher", "Source", "Accessed", "Applicability"]
+    _set_table_geometry(reference_table, _column_widths(reference_columns, reference_rows, layout_policy))
+    accessed_index = reference_columns.index("Accessed")
+    _set_no_wrap(reference_table.rows[0].cells[accessed_index])
+    for row in reference_table.rows[1:]:
+        _set_no_wrap(row.cells[accessed_index])
 
     doc.add_heading("Appendices", level=1)
     doc.add_heading("Appendix A — Analysis Selections and Results", level=2)
@@ -1079,7 +1311,7 @@ def _build_report_owned(
     doc.add_heading("Appendix B — Build and Quality-Assurance Contract", level=2)
     doc.add_paragraph("The candidate report was compiled from all fifteen hash-bound validated stage outputs and a hash-bound report model. Deterministic validation, publication-safety inspection, accessibility review, privacy and metadata review, citation and bookmark audit, scoring reconciliation, secure review, native Microsoft Word rendering, page count, and every-page inspection are shipping gates. A passed candidate build alone is not an authoritative determination.")
     doc.add_heading("Glossary", level=1)
-    _add_table(doc, "Glossary", ["Term", "Definition"], [[str(item["term"]), str(item["definition"])] for item in model["glossary"]], compact=True)
+    _add_table(doc, "Glossary", ["Term", "Definition"], [[str(item["term"]), str(item["definition"])] for item in model["glossary"]], layout_policy, compact=True)
 
     _assert_contents_starts_on_fresh_page(doc)
     with _open_owned_file(output, output_identity, "output", write=True) as stream:
@@ -1092,9 +1324,14 @@ def build_report(
     output: Path,
     figure_path: Path,
     *,
+    layout_policy: dict[str, object] | None = None,
     output_identity: FileIdentity | None = None,
     figure_identity: FileIdentity | None = None,
 ) -> None:
+    if layout_policy is None:
+        layout_policy, _ = load_layout_policy()
+    else:
+        layout_policy = validate_layout_policy(layout_policy)
     created: list[tuple[Path, FileIdentity]] = []
     try:
         if figure_identity is None:
@@ -1105,6 +1342,7 @@ def build_report(
             created.append((output, output_identity))
         _build_report_owned(
             model,
+            layout_policy,
             output,
             figure_path,
             output_identity,
@@ -1127,10 +1365,14 @@ def write_build_manifest(
     claims: dict[str, str],
     *,
     workspace_root: Path,
+    layout_policy_path: Path = DEFAULT_LAYOUT_POLICY,
+    layout_policy_sha256: str | None = None,
     output_source: Path | None = None,
     output_source_identity: FileIdentity | None = None,
     manifest_identity: FileIdentity | None = None,
 ) -> None:
+    if layout_policy_sha256 is None:
+        _, layout_policy_sha256 = load_layout_policy(layout_policy_path)
     stage_hashes = {str(item["file"]): str(item["sha256"]) for item in stages}
     digest_source = output if output_source is None else output_source
     if output_source_identity is None:
@@ -1152,9 +1394,13 @@ def write_build_manifest(
         "schema_version": 1,
         "assessment": model["assessment"],
         "run_key": model["run_key"],
-        "parent_skill_version": "1.4.5",
+        "parent_skill_version": "1.4.6",
         "design_preset": "standard_business_brief",
         "header_pattern": "memo_masthead",
+        "layout_policy": {
+            "policy_id": "authoritative-report-default",
+            "sha256": layout_policy_sha256,
+        },
         "generated_at": datetime.now(UTC).isoformat(),
         "python": sys.version.split()[0],
         "python_docx": importlib.metadata.version("python-docx"),
@@ -1194,6 +1440,7 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--stage-root", required=True, type=Path)
     parser.add_argument("--output", required=True, type=Path)
     parser.add_argument("--build-manifest", required=True, type=Path)
+    parser.add_argument("--layout-policy", type=Path, default=DEFAULT_LAYOUT_POLICY)
     args = parser.parse_args(argv)
     workspace_root = _resolve_workspace_root(args.workspace_root)
     stage_root = _resolve_stage_root(args.stage_root, workspace_root)
@@ -1202,6 +1449,7 @@ def main(argv: list[str] | None = None) -> int:
         args.build_manifest, "build manifest", workspace_root
     )
     model, stages, report_model_sha256, stage_manifest_sha256, claims = load_bound_report_model(stage_root)
+    layout_policy, layout_policy_sha256 = load_layout_policy(args.layout_policy)
     figure_path = _resolve_destination(
         manifest_path.parent / f"{model['run_key']}-architecture.png",
         "architecture figure",
@@ -1227,6 +1475,7 @@ def main(argv: list[str] | None = None) -> int:
             model,
             output_temp,
             figure_temp,
+            layout_policy=layout_policy,
             output_identity=output_identity,
             figure_identity=figure_identity,
         )
@@ -1240,6 +1489,8 @@ def main(argv: list[str] | None = None) -> int:
             stage_manifest_sha256,
             claims,
             workspace_root=workspace_root,
+            layout_policy_path=args.layout_policy,
+            layout_policy_sha256=layout_policy_sha256,
             output_source=output_temp,
             output_source_identity=output_identity,
             manifest_identity=manifest_identity,

@@ -354,6 +354,26 @@ class AssessmentDocxBuilderTests(unittest.TestCase):
         with self.assertRaisesRegex(MODULE.ModelError, "fresh page"):
             MODULE._assert_contents_starts_on_fresh_page(document)
 
+    def test_persisted_layout_policy_rejects_drift(self) -> None:
+        policy, digest = MODULE.load_layout_policy()
+        self.assertEqual(policy["policy_id"], "authoritative-report-default")
+        self.assertRegex(digest, r"^[0-9a-f]{64}$")
+        changed = dict(policy)
+        changed["cover"] = dict(policy["cover"])
+        changed["cover"]["classification_location"] = "header_and_body"
+        with self.assertRaisesRegex(MODULE.ModelError, "cover rules"):
+            MODULE.validate_layout_policy(changed)
+
+    def test_connector_routes_terminate_at_node_boundaries(self) -> None:
+        source = (80, 180, 410, 330)
+        target = (920, 480, 1250, 630)
+        points = MODULE._route_connector(source, target, 0, 6, 4)
+        self.assertGreaterEqual(len(points), 4)
+        self.assertEqual(points[0][1], source[3])
+        self.assertEqual(points[-1][1], target[1])
+        self.assertTrue(all(not (source[0] < x < source[2] and source[1] < y < source[3]) for x, y in points[1:]))
+        self.assertTrue(all(not (target[0] < x < target[2] and target[1] < y < target[3]) for x, y in points[:-1]))
+
     def test_model_rejects_prohibited_internal_lessons_content(self) -> None:
         model = _model()
         model["review_trigger"] = "See LL-0001"
@@ -398,6 +418,50 @@ class AssessmentDocxBuilderTests(unittest.TestCase):
             rendered = Document(output)
             contents_index = next(index for index, paragraph in enumerate(rendered.paragraphs) if paragraph.text == "Contents")
             self.assertIn('w:type="page"', rendered.paragraphs[contents_index - 1]._p.xml)
+            header_text = " ".join(paragraph.text for paragraph in rendered.sections[0].header.paragraphs)
+            self.assertIn(str(model["assessment"]), header_text)
+            self.assertNotIn(str(model["extension_id"]), header_text)
+            self.assertIn("Classification: PUBLIC", header_text)
+            footer_text = "\n".join(
+                paragraph.text for section in rendered.sections for paragraph in section.footer.paragraphs
+            )
+            self.assertIn("Page ", footer_text)
+            self.assertNotIn("PUBLIC", footer_text)
+            body_text = "\n".join(paragraph.text for paragraph in rendered.paragraphs)
+            self.assertNotIn("Classification: PUBLIC", body_text)
+            self.assertNotIn("Classification", [cell.text for table in rendered.tables for row in table.rows for cell in row.cells])
+            contents_xml = rendered.paragraphs[contents_index + 1]._p.xml
+            self.assertIn('TOC \\o &quot;1-3&quot; \\h \\z \\u', contents_xml)
+            self.assertIn('w:dirty="true"', contents_xml)
+            self.assertIn("w:updateFields", rendered.settings._element.xml)
+            first_heading_after_contents = next(
+                index
+                for index in range(contents_index + 1, len(rendered.paragraphs))
+                if rendered.paragraphs[index].style.name.startswith("Heading")
+            )
+            self.assertFalse(
+                any(
+                    paragraph.style.name == "List Bullet"
+                    for paragraph in rendered.paragraphs[contents_index + 1:first_heading_after_contents]
+                )
+            )
+            evidence_table = next(
+                table
+                for table in rendered.tables
+                if [cell.text for cell in table.rows[0].cells] == ["ID", "Evidence", "Source", "Method", "State", "Limitation"]
+            )
+            state_index = 4
+            self.assertGreaterEqual(int(evidence_table._tbl.tblGrid.gridCol_lst[state_index].get(MODULE.qn("w:w"))), 1080)
+            references_table = next(
+                table
+                for table in rendered.tables
+                if [cell.text for cell in table.rows[0].cells] == ["ID", "Title", "Publisher", "Source", "Accessed", "Applicability"]
+            )
+            accessed_index = 4
+            self.assertGreaterEqual(int(references_table._tbl.tblGrid.gridCol_lst[accessed_index].get(MODULE.qn("w:w"))), 1260)
+            self.assertTrue(
+                all(row.cells[accessed_index]._tc.tcPr.first_child_found_in("w:noWrap") is not None for row in references_table.rows)
+            )
         self.assertTrue(result.passed, result.failures)
         assert result.metrics
         self.assertGreaterEqual(result.metrics.words, 4_000)

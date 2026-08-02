@@ -33,6 +33,22 @@ try {
     $word.DisplayAlerts = 0
     $word.AutomationSecurity = 3
     $document = $word.Documents.Open($staged, $false, $true, $false)
+    $tablesOfContents = $document.TablesOfContents
+    try {
+        for ($index = 1; $index -le $tablesOfContents.Count; $index++) {
+            $tableOfContents = $tablesOfContents.Item($index)
+            try {
+                $tableOfContents.Update() | Out-Null
+                $tableOfContents.UpdatePageNumbers() | Out-Null
+            }
+            finally {
+                [Runtime.InteropServices.Marshal]::FinalReleaseComObject($tableOfContents) | Out-Null
+            }
+        }
+    }
+    finally {
+        [Runtime.InteropServices.Marshal]::FinalReleaseComObject($tablesOfContents) | Out-Null
+    }
     $pageCount = $document.ComputeStatistics(2)
     $document.ExportAsFixedFormat($temporaryPdf, 17)
     $document.Close(0)

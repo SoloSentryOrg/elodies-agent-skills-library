@@ -63,11 +63,12 @@ REQUIRED_PATHS = {
     "schemas/report-model.schema.json",
     "schemas/stage-manifest.schema.json",
     "schemas/validated-claims.schema.json",
+    "templates/authoritative-report-layout.json",
     "pptx-runtime-acceptance.json",
 }
 MANIFEST_NAME = "package-manifest.json"
 SOURCE_REPOSITORY = "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
-SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.5"
+SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.6"
 MAX_FILE_BYTES = 16 * 1024 * 1024
 
 
