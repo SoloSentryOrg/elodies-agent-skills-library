@@ -1,0 +1,36 @@
+{
+  "content_digest": "sha256:1283393f3f7f649868d703a8d10058c359eb8cf22b4e3d962a7c63dfba5c13c7",
+  "package_id": "m365h-1283393f3f7f649868d7",
+  "files": [
+    {
+      "bytes": 947,
+      "path": "HANDOFF.md",
+      "sha256": "847ef45a98151d083dbebb9d8db1615bdd44059573bc7e814e2077035d90ef40"
+    },
+    {
+      "bytes": 339,
+      "path": "evidence/source-register.json",
+      "sha256": "ee64078ea151993423de28cdef016ce7b105fc6a9bb3b2986514ae30c182204b"
+    },
+    {
+      "bytes": 199,
+      "path": "evidence/validation-report.json",
+      "sha256": "c76960a2788ad684ac1b5b64ddf8f0c8c4940d33774917bc875d5861e2c544f4"
+    },
+    {
+      "bytes": 203,
+      "path": "evidence/validation-report.txt",
+      "sha256": "ab262dd77eaaff751338ebc68d97d77b7b5e5b9ccc5bcdb6da4c57526f4521c5"
+    },
+    {
+      "bytes": 1379,
+      "path": "payloads/executive-report.word.json",
+      "sha256": "23208d126bbe189d030c30de98cfd2143ee3a0a89f4786c012589d78f37887d2"
+    },
+    {
+      "bytes": 513,
+      "path": "previews/executive-report.md",
+      "sha256": "c3ff872fd62a8d019a9833891d7eb2a62ae60db15ec12ce0c4f4a7a1f80676a5"
+    }
+  ]
+}

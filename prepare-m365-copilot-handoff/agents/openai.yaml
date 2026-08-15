@@ -1,0 +1,4 @@
+interface:
+  display_name: "Prepare M365 Copilot Handoff"
+  short_description: "Build validated Microsoft 365 handoff packages"
+  default_prompt: "Use $prepare-m365-copilot-handoff to build and validate an immutable Word handoff package for manual Microsoft 365 Copilot processing."

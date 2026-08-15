@@ -1,0 +1,15 @@
+{
+  "schema_version": "1.0",
+  "sources": [
+    {
+      "source_id": "synthetic-source",
+      "title": "Synthetic handoff fixture",
+      "source_type": "synthetic",
+      "original_location": "local synthetic fixture",
+      "acquired_on": "2026-08-15",
+      "sha256": "2222222222222222222222222222222222222222222222222222222222222222",
+      "permitted_use": "handoff-only",
+      "classification": "internal"
+    }
+  ]
+}
