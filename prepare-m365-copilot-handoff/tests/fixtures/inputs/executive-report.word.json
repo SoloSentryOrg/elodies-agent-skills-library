@@ -1,0 +1,70 @@
+{
+  "schema_version": "1.0",
+  "artifact_id": "executive-report",
+  "locale": "en-GB",
+  "title": "Synthetic Executive Report",
+  "purpose": "Demonstrate the deterministic Word handoff contract.",
+  "audience": "Internal governance reviewers",
+  "sections": [
+    {
+      "section_id": "section-title",
+      "slot_id": "title",
+      "heading": "Synthetic Executive Report",
+      "heading_level": 1,
+      "blocks": [
+        {
+          "block_id": "title-summary",
+          "type": "paragraph",
+          "text": "This package contains synthetic material only.",
+          "source_ids": ["synthetic-source"]
+        }
+      ]
+    },
+    {
+      "section_id": "section-executive-summary",
+      "slot_id": "executive-summary",
+      "heading": "Executive Summary",
+      "heading_level": 1,
+      "blocks": [
+        {
+          "block_id": "summary-paragraph",
+          "type": "paragraph",
+          "text": "The Word handoff contract is deterministic, bounded and fail closed.",
+          "source_ids": ["synthetic-source"]
+        }
+      ]
+    },
+    {
+      "section_id": "section-findings",
+      "slot_id": "findings",
+      "heading": "Findings",
+      "heading_level": 1,
+      "blocks": [
+        {
+          "block_id": "findings-list",
+          "type": "list",
+          "ordered": false,
+          "items": [
+            "Trusted instructions remain separate from source content.",
+            "All Word-facing semantic content is labelled en-GB."
+          ],
+          "source_ids": ["synthetic-source"]
+        }
+      ]
+    },
+    {
+      "section_id": "section-recommendations",
+      "slot_id": "recommendations",
+      "heading": "Recommendations",
+      "heading_level": 1,
+      "blocks": [
+        {
+          "block_id": "recommendation-callout",
+          "type": "callout",
+          "text": "Review the package digest before manual transfer.",
+          "source_ids": ["synthetic-source"]
+        }
+      ]
+    }
+  ]
+}

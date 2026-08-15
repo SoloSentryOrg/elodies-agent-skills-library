@@ -50,6 +50,20 @@ jobs:
           -s ms-ai-ide-extension-security-assessment/scripts
           -p 'test_*.py'
 
+      - name: Install hash-locked M365 handoff dependencies
+        run: >-
+          python3 -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes
+          -r prepare-m365-copilot-handoff/scripts/requirements.lock
+
+      - name: Run M365 handoff regression tests
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python3 -m unittest discover
+          -s prepare-m365-copilot-handoff/tests
+          -p 'test_*.py'
+
       - name: Validate immutable PowerPoint runtime acceptance
         run: >-
           python3 ms-ai-ide-extension-security-assessment/scripts/validate_pptx_runtime_acceptance.py
@@ -98,6 +112,20 @@ jobs:
         run: >-
           python -m unittest discover
           -s ms-ai-ide-extension-security-assessment/scripts
+          -p 'test_*.py'
+
+      - name: Install hash-locked M365 handoff dependencies
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes
+          -r prepare-m365-copilot-handoff/scripts/requirements.lock
+
+      - name: Run M365 handoff regression tests on Windows
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python -m unittest discover
+          -s prepare-m365-copilot-handoff/tests
           -p 'test_*.py'
 
       - name: Parse Windows Office adapters

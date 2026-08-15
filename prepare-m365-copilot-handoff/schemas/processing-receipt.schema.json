@@ -1,0 +1,42 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.solosentry.example/m365-handoff/v1/processing-receipt.schema.json",
+  "title": "Copilot processing receipt contract (Phase 2 input)",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "package_id", "input_content_digest", "status", "processed_at", "agent", "outputs"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "package_id": {"type": "string", "pattern": "^m365h-[0-9a-f]{20}$"},
+    "input_content_digest": {"type": "string", "pattern": "^sha256:[0-9a-f]{64}$"},
+    "status": {"enum": ["completed", "rejected", "needs-input"]},
+    "processed_at": {"type": "string", "format": "date-time"},
+    "agent": {
+      "type": "object",
+      "additionalProperties": false,
+      "required": ["id", "version"],
+      "properties": {
+        "id": {"type": "string", "minLength": 1, "maxLength": 200},
+        "version": {"type": "string", "minLength": 1, "maxLength": 100}
+      }
+    },
+    "outputs": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": ["artifact_id", "path", "sha256", "template_profile_id", "template_version", "template_sha256", "consumed_slots", "warnings"],
+        "properties": {
+          "artifact_id": {"type": "string"},
+          "path": {"type": "string", "pattern": "^outputs/[A-Za-z0-9 ._-]+[.]docx$"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "template_profile_id": {"type": "string"},
+          "template_version": {"type": "string"},
+          "template_sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "consumed_slots": {"type": "array", "uniqueItems": true, "items": {"type": "string"}},
+          "warnings": {"type": "array", "items": {"type": "string", "maxLength": 500}}
+        }
+      }
+    }
+  }
+}

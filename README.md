@@ -7,6 +7,7 @@ A collection of reusable Agent Skills maintained by SoloSentry for public review
 | Skill | Purpose |
 |---|---|
 | [`ms-ai-ide-extension-security-assessment`](ms-ai-ide-extension-security-assessment/) | Produces repeatable, evidence-led security assessments for AI-related Visual Studio and VS Code extensions, MCP integrations, and installed Agent Skills. |
+| [`prepare-m365-copilot-handoff`](prepare-m365-copilot-handoff/) | Builds and validates immutable Word handoff packages for manual Microsoft 365 Copilot processing. |
 
 ## Repository model
 

@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://schemas.solosentry.example/m365-handoff/v1/source-register.schema.json",
+  "title": "Handoff source register",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["schema_version", "sources"],
+  "properties": {
+    "schema_version": {"const": "1.0"},
+    "sources": {
+      "type": "array",
+      "maxItems": 256,
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "source_id",
+          "title",
+          "source_type",
+          "original_location",
+          "acquired_on",
+          "sha256",
+          "permitted_use",
+          "classification"
+        ],
+        "properties": {
+          "source_id": {"type": "string", "pattern": "^[a-z0-9][a-z0-9-]{2,63}$"},
+          "title": {"type": "string", "minLength": 1, "maxLength": 300},
+          "source_type": {"enum": ["user-provided", "authoritative-reference", "synthetic"]},
+          "original_location": {"type": "string", "minLength": 1, "maxLength": 500},
+          "acquired_on": {"type": "string", "format": "date"},
+          "sha256": {"type": "string", "pattern": "^[0-9a-f]{64}$"},
+          "permitted_use": {"enum": ["handoff-only", "internal-reuse"]},
+          "classification": {"const": "internal"}
+        }
+      }
+    }
+  }
+}

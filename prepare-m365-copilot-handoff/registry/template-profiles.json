@@ -1,0 +1,31 @@
+{
+  "schema_version": "1.0",
+  "policy": {
+    "max_file_count": 64,
+    "max_individual_file_bytes": 10485760,
+    "max_total_package_bytes": 52428800
+  },
+  "profiles": [
+    {
+      "template_profile_id": "solosentry-word-handoff-pilot",
+      "artifact_kind": "word",
+      "display_name": "SoloSentry Word Handoff Synthetic Pilot",
+      "version": "1.0.0",
+      "template_filename": "SoloSentry Word Handoff Pilot.dotx",
+      "template_sha256": "1111111111111111111111111111111111111111111111111111111111111111",
+      "permitted_output_extensions": [".docx"],
+      "required_slots": ["title", "executive-summary", "findings", "recommendations"],
+      "optional_slots": ["sources"],
+      "locale": "en-GB",
+      "accessibility": {
+        "require_heading_structure": true,
+        "require_table_headers": true,
+        "require_figure_alt_text": true
+      },
+      "lifecycle_state": "approved",
+      "environment": "synthetic-test",
+      "owner": "SoloSentry template governance owner",
+      "logical_location": "tenant-configured-template-library/synthetic-pilot"
+    }
+  ]
+}
