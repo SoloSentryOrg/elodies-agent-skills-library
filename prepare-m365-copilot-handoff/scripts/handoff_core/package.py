@@ -29,6 +29,12 @@ from .reports import render_handoff, render_preview, validation_report_bytes
 
 MANIFEST_SCHEMA_URI = "https://schemas.solosentry.example/m365-handoff/v1/handoff-manifest.schema.json"
 PRODUCER = {"name": "prepare-m365-copilot-handoff", "version": "1.0.0"}
+FIXED_BUILD_CONTROLS = {
+    "operation": "create",
+    "require_human_approval_before_replace": True,
+    "allow_external_publication": False,
+    "allow_macros": False,
+}
 GENERATED_PURPOSES = {"human-handoff", "validation-evidence"}
 ALLOWED_TOP_LEVEL = {"handoff-manifest.json", "HANDOFF.md", "payloads", "previews", "evidence"}
 
@@ -136,7 +142,7 @@ def build_package(job_path: Path, workspace: Path, registry_path: Path, output: 
         {
             "request_summary": job["request_summary"],
             "destination": job["destination"],
-            "trusted_instructions": job["trusted_instructions"],
+            "trusted_instructions": FIXED_BUILD_CONTROLS,
         },
         context="job",
     )
@@ -222,7 +228,7 @@ def build_package(job_path: Path, workspace: Path, registry_path: Path, output: 
             "locale": job["locale"],
             "request_summary": job["request_summary"],
             "destination": job["destination"],
-            "trusted_instructions": job["trusted_instructions"],
+            "trusted_instructions": FIXED_BUILD_CONTROLS,
             "artifacts": artifacts,
             "files": sorted(entries, key=lambda entry: entry["path"]),
             "sources": source_register["sources"],

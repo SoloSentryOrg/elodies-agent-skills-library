@@ -180,6 +180,16 @@ class HandoffPackageTests(unittest.TestCase):
         self.assertIn("HND005", {item.code for item in secret.exception.diagnostics})
         self.assertNotIn("github_pat_", str(secret.exception))
 
+    def test_secret_bearing_trusted_instruction_is_rejected_before_any_write(self) -> None:
+        job = load_json(self.job)
+        job["trusted_instructions"]["credential"] = "github_pat_" + "A" * 30
+        self.write_job(job)
+        with mock.patch("handoff_core.package._write", side_effect=AssertionError("package write must not begin")):
+            with self.assertRaises(HandoffError) as caught:
+                self.build()
+        self.assertIn("HND001", {item.code for item in caught.exception.diagnostics})
+        self.assertEqual(list(self.output.iterdir()), [])
+
     def test_tamper_and_extra_file_fail_integrity(self) -> None:
         built = self.build()
         package = Path(built["package"])
