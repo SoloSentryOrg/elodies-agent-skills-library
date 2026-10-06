@@ -27,6 +27,9 @@ REQUIRED_PATHS = {
     "scripts/build_assessment_pptx.mjs",
     "scripts/build_release_archive.py",
     "scripts/create_artifact_runtime_receipt.mjs",
+    "scripts/stable_regular_file.mjs",
+    "scripts/test_stable_regular_file.mjs",
+    "scripts/test_stable_regular_file.py",
     "scripts/create_pptx_montage.py",
     "scripts/allowed-docx-custom-xml.json",
     "scripts/build_release_manifest.py",
@@ -68,7 +71,7 @@ REQUIRED_PATHS = {
 }
 MANIFEST_NAME = "package-manifest.json"
 SOURCE_REPOSITORY = "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
-SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.6"
+SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.7"
 MAX_FILE_BYTES = 16 * 1024 * 1024
 
 

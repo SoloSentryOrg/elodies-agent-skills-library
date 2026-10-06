@@ -73,6 +73,24 @@ distribution to force installation.
   `scripts/create_artifact_runtime_receipt.mjs` binds its package identity,
   version, entrypoint, and digests. Keep the prepared runtime workspace and its
   receipt outside the untrusted assessment workspace.
+The JavaScript receipt and builder share `scripts/stable_regular_file.mjs`.
+The receipt retains its 64 MiB per-file and 512 MiB total package bounds;
+the builder caps each file read at 512 MiB. Reads use a verified regular-file
+descriptor, reject growth or identity/metadata changes, and close the handle on
+failure. POSIX hosts require no-follow and nonblocking open flags so a replaced
+FIFO cannot wait for a writer. Windows checks the opened handle and leaf identity
+before reading; it does not claim POSIX no-follow flags or descriptor-relative
+ancestor protection. Keep runtime and output directories trusted on every host.
+
+The presentation builder binds every authored text box, including footers, to
+its exact name and text before asking the renderer for layout evidence. The
+layout gate rejects missing, renamed, altered, duplicate or additional text,
+requires positive text bounds and line counts, and applies the 16-point minimum
+to all authored text. Single-line title requirements come from the authoring
+path. The retained v4-only gate remains fail-closed; the current v5 renderer
+lacks the former resolved font and line-count evidence. These source checks do
+not establish native rendering acceptance or update historical acceptance.
+
 - `scripts/validate_assessment_pptx.py` rejects macros, ActiveX, embedded
   objects, review content, unsafe external relationships, and non-neutral
   author metadata before a generated deck is published.
@@ -84,7 +102,13 @@ distribution to force installation.
   accessibility checks, privacy checks, and the Word contents-page rule pass.
 - `scripts/render_reports_with_word.applescript` and
   `scripts/render_presentations_with_powerpoint.applescript` automate native
-  Office rendering on an authorized macOS host.
+  Office rendering on an authorized macOS host. The PowerPoint adapter resolves
+  the complete Office-reported path before matching its unique staged input;
+  basename matching is never sufficient. Its error handler closes only an
+  identified presentation. If Office has not exposed that identity (for example,
+  while awaiting file-access approval), the private stage is retained for
+  explicit operator cleanup. Per-event automation timeouts remain distinct from
+  the caller's overall process deadline and from native rendering acceptance.
 - `scripts/render_reports_with_word.ps1` and
   `scripts/render_presentations_with_powerpoint.ps1` provide the equivalent
   macro-disabled, read-only native Office QA adapters on an authorized Windows

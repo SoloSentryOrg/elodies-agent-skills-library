@@ -121,6 +121,129 @@ def valid_model() -> dict[str, object]:
 
 
 class AssessmentPptxTests(unittest.TestCase):
+    def test_layout_gate_rejects_incomplete_rendering_evidence(self) -> None:
+        """Exercise the actual guard with malformed evidence, not authored models."""
+        probe = r'''
+          const fs = require("node:fs");
+          const vm = require("node:vm");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const start = source.indexOf("function validateLayout(");
+          const end = source.indexOf("\nasync function createMontage(", start);
+          assert.ok(start >= 0 && end > start);
+          const validate = vm.runInNewContext(`(${source.slice(start, end)})`, {
+            ModelError: Error, Buffer,
+          }, { timeout: 1000 });
+          const title = { name: "slide-title-1", bbox: [40, 40, 1200, 60],
+            text: "Readable title", resolvedFontSize: 32, textLayout: { lineCount: 1 } };
+          const expectations = [{ name: title.name, text: title.text, singleLine: true }];
+          const validateGuard = validate;
+          // Geometry-only controls explicitly author no text; every text control
+          // is bound to the trusted title, irrespective of renderer omissions.
+          const check = (value, stem, expected = expectations) => validateGuard(value, stem, expected);
+          const manifest = (elements) => JSON.stringify({
+            schema: "openai.presentation.layout/v4", elements,
+          });
+          check(manifest([title]), "valid");
+          // A line's zero-height geometry remains permitted.
+          check(manifest([{ bbox: [40, 140, 800, 0] }]), "line", []);
+          for (const bbox of [undefined, [], [0, 0, 100], "0,0,100,100"]) {
+            const unsafe = { ...title, bbox, resolvedFontSize: 1,
+              textLayout: { lineCount: 3 } };
+            assert.throws(() => check(manifest([unsafe]), "incomplete"),
+              /incomplete layout bounds/);
+          }
+          for (const element of [null, false, 42, [], "text"]) {
+            assert.throws(() => check(manifest([element]), "invalid"),
+              /incomplete layout bounds/);
+          }
+          assert.throws(() => check(manifest([]), "empty"), /unsupported/);
+          check(manifest(Array(4096).fill({ bbox: [40, 140, 800, 0] })), "count-boundary", []);
+          assert.throws(() => check(manifest(Array(4097).fill(title)), "count"), /unsupported/);
+          assert.throws(() => check(" ".repeat(8 * 1024 * 1024 + 1), "size"), /oversized/);
+          assert.throws(() => check(null, "non-string"), /invalid layout manifest/);
+          assert.throws(() => check("{", "invalid-json"));
+          for (const bbox of [[null, 0, 100, 100], ["0", 0, 100, 100],
+            [0, 0, -1, 100], [0, 0, 100, -1]]) {
+            assert.throws(() => check(manifest([{ ...title, bbox }]), "coordinates"), /overflows/);
+          }
+          assert.throws(() => check(manifest([{ ...title, bbox: [0, 0, 1281, 100] }]),
+            "overflow"), /overflows/);
+          assert.throws(() => check(manifest([{ ...title, resolvedFontSize: 15 }]),
+            "tiny"), /below 16pt/);
+          assert.throws(() => check(manifest([{ ...title, textLayout: { lineCount: 2 } }]),
+            "wrapped"), /wraps/);
+          assert.throws(() => check(JSON.stringify({
+            schema: "openai.presentation.layout/v5", elements: [title],
+          }), "unsupported-runtime"), /unsupported/);
+          assert.throws(() => validateGuard(manifest([title]), "missing-authoring"), /authored text expectations/);
+          for (const text of [undefined, null, "", "Other text", 42]) {
+            assert.throws(() => check(manifest([{ ...title, text }]), "omitted-text"), /authored text evidence/);
+          }
+          assert.throws(() => check(manifest([{ ...title, name: "footer-forged" }]), "renamed"), /unbound/);
+          assert.throws(() => check(manifest([{ bbox: [40, 140, 800, 0] }]), "missing-text"), /missing authored/);
+          assert.throws(() => check(manifest([title, title]), "duplicate"), /duplicate authored/);
+          for (const textLayout of [undefined, {}, { lineCount: 0 }, { lineCount: 1.5 }, { lineCount: "1" }]) {
+            assert.throws(() => check(manifest([{ ...title, textLayout }]), "lines"), /line-layout/);
+          }
+          const footer = { ...title, name: "footer-number-1", resolvedFontSize: 15 };
+          assert.throws(() => check(manifest([footer]), "tiny-footer", [
+            { name: footer.name, text: footer.text, singleLine: false },
+          ]), /below 16pt/);
+          for (const expected of [null, {}, [{ ...expectations[0], text: "" }],
+            [expectations[0], expectations[0]], [{ ...expectations[0], singleLine: "false" }]]) {
+            assert.throws(() => check(manifest([title]), "invalid-authoring", expected), /authored text expectations/);
+          }
+        '''
+        result = subprocess.run(
+            ["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_authored_text_is_independent_of_renderer_metadata(self) -> None:
+        probe = r'''
+          const fs = require("node:fs");
+          const vm = require("node:vm");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const start = source.indexOf("function addText(");
+          const end = source.indexOf("\nfunction addFooter(", start);
+          const authored = new WeakMap();
+          const add = vm.runInNewContext(`(${source.slice(start, end)})`, {
+            ModelError: Error, AUTHORED_TEXT: authored,
+          }, { timeout: 1000 });
+          const shapes = [];
+          const slide = { shapes: { add(config) {
+            const shape = { config };
+            Object.defineProperty(shape, "text", {
+              get() { return this.frame; }, set(value) { this.frame = { value }; },
+            });
+            shapes.push(shape); return shape;
+          } } };
+          add(slide, "slide-title-2", "Exact title", { left: 40, top: 40, width: 1200, height: 60 }, 40);
+          add(slide, "body-2", "Two lines\nExact body", { left: 40, top: 140, width: 1200, height: 100 }, 18);
+          add(slide, "footer-number-2", "2", { left: 1100, top: 660, width: 100, height: 28 }, 16);
+          const expected = authored.get(slide);
+          assert.equal(expected.length, 3);
+          assert.equal(expected[0].singleLine, true);
+          assert.equal(expected[1].singleLine, false);
+          assert.equal(expected[2].singleLine, false);
+          assert.equal(expected[1].text, "Two lines\nExact body");
+          assert.ok(expected.every(Object.isFrozen));
+          shapes[0].frame.value = "Renderer altered title";
+          shapes[0].config.name = "footer-forged";
+          assert.equal(expected[0].text, "Exact title");
+          assert.equal(expected[0].name, "slide-title-2");
+          assert.equal(shapes[2].frame.style.fontSize, 16 * 96 / 72);
+          assert.throws(() => add(slide, "slide-title-2", "Duplicate", {}, 40), /duplicate/);
+          assert.equal(authored.get(slide).length, 3);
+          assert.equal(shapes.length, 3);
+        '''
+        result = subprocess.run(
+            ["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory(dir=ROOT)
         self.addCleanup(self.tempdir.cleanup)
@@ -730,6 +853,7 @@ class AssessmentPptxTests(unittest.TestCase):
             bound_files = (
                 "scripts/build_assessment_pptx.mjs",
                 "scripts/create_artifact_runtime_receipt.mjs",
+                "scripts/stable_regular_file.mjs",
                 "scripts/create_pptx_montage.py",
                 "scripts/portable_fs.py",
                 "scripts/requirements.lock",

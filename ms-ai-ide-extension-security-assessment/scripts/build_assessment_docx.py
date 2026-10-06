@@ -1394,7 +1394,7 @@ def write_build_manifest(
         "schema_version": 1,
         "assessment": model["assessment"],
         "run_key": model["run_key"],
-        "parent_skill_version": "1.4.6",
+        "parent_skill_version": "1.4.7",
         "design_preset": "standard_business_brief",
         "header_pattern": "memo_masthead",
         "layout_policy": {

@@ -14,6 +14,7 @@ from pathlib import Path
 BOUND_FILES = (
     "scripts/build_assessment_pptx.mjs",
     "scripts/create_artifact_runtime_receipt.mjs",
+    "scripts/stable_regular_file.mjs",
     "scripts/create_pptx_montage.py",
     "scripts/portable_fs.py",
     "scripts/requirements.lock",

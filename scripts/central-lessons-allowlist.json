@@ -1,6 +1,6 @@
 {
   "source": "SoloSentryOrg/github-enterprise-management-solosentry:docs/lessons-learned/register.json",
-  "reviewed_at": "2026-08-01",
+  "reviewed_at": "2026-10-06",
   "allowed_lesson_ids": [
     "LL-0001",
     "LL-0002",
@@ -12,6 +12,9 @@
     "LL-0008",
     "LL-0009",
     "LL-0010",
-    "LL-0011"
-  ]
+    "LL-0011",
+    "LL-0012"
+  ],
+  "source_commit": "5effa38498a9e8863cd3e576d6e9242bd0cfa983",
+  "register_sha256": "d233858dc0d8ec0ba385ed6ac432ef0e187c313a35a077e133abddafbf9e2933"
 }

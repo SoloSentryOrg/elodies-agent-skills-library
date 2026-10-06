@@ -3,6 +3,7 @@
 /** Build an editable PowerPoint derivative from a validated assessment model. */
 
 import fs from "node:fs/promises";
+import { readStableRegularFile as readDescriptorFile } from "./stable_regular_file.mjs";
 import path from "node:path";
 import process from "node:process";
 import crypto from "node:crypto";
@@ -18,6 +19,8 @@ const SECURE_BUNDLE_HELPER = path.join(SCRIPT_DIR, "secure_pptx_stage_bundle.py"
 const PPTX_VALIDATOR = path.join(SCRIPT_DIR, "validate_assessment_pptx.py");
 
 const MAX_TEXT_BYTES = 64 * 1024;
+// Expectations belong to the authoring path, not the untrusted renderer manifest.
+const AUTHORED_TEXT = new WeakMap();
 const MAX_FINDINGS = 100;
 const MAX_REFERENCES = 250;
 const DECISIONS = new Set([
@@ -651,7 +654,12 @@ function notesFor(model, ids) {
   return lines.join("\n");
 }
 
-function addText(slide, name, value, position, fontSize, options = {}) {
+function addText(slide, name, value, position, fontSizePt, options = {}) {
+  const expectations = AUTHORED_TEXT.get(slide) || [];
+  if (expectations.length >= 4096) throw new ModelError("authored text count exceeds layout bounds");
+  if (expectations.some((item) => item.name === name)) throw new ModelError("duplicate authored text name");
+  expectations.push(Object.freeze({ name, text: value, singleLine: name.startsWith("slide-title-") }));
+  AUTHORED_TEXT.set(slide, expectations);
   const shape = slide.shapes.add({
     geometry: "textbox",
     name,
@@ -661,7 +669,10 @@ function addText(slide, name, value, position, fontSize, options = {}) {
   });
   shape.text = value;
   shape.text.style = {
-    fontSize,
+    // Authoring values are points; artifact-tool's numeric fontSize is pixels.
+    // Keep this conversion separate from the rendered-size acceptance gate:
+    // shrinkText may still reduce the resulting size below the minimum.
+    fontSize: fontSizePt * (96 / 72),
     typeface: "Helvetica Neue",
     color: options.color || "#000000",
     bold: options.bold || false,
@@ -994,26 +1005,57 @@ async function writeBlob(filename, blob) {
   await fs.writeFile(filename, new Uint8Array(await blob.arrayBuffer()), { flag: "wx", mode: 0o600 });
 }
 
-function validateLayout(layoutText, stem) {
+function validateLayout(layoutText, stem, authoredText) {
+  if (!Array.isArray(authoredText) || authoredText.length > 4096) {
+    throw new ModelError(`${stem} lacks bounded authored text expectations`);
+  }
+  const expected = new Map();
+  for (const item of authoredText) {
+    if (!item || typeof item.name !== "string" || !item.name
+      || typeof item.text !== "string" || !item.text.trim()
+      || typeof item.singleLine !== "boolean" || expected.has(item.name)) {
+      throw new ModelError(`${stem} has invalid authored text expectations`);
+    }
+    expected.set(item.name, item);
+  }
+  const observed = new Set();
+  if (typeof layoutText !== "string" || Buffer.byteLength(layoutText, "utf8") > 8 * 1024 * 1024) {
+    throw new ModelError(`${stem} produced an oversized or invalid layout manifest`);
+  }
   const layout = JSON.parse(layoutText);
-  if (layout?.schema !== "openai.presentation.layout/v4" || !Array.isArray(layout.elements)) {
+  if (layout?.schema !== "openai.presentation.layout/v4" || !Array.isArray(layout.elements)
+    || layout.elements.length === 0 || layout.elements.length > 4096) {
     throw new ModelError(`${stem} produced an unsupported layout manifest`);
   }
-  for (const element of layout.elements) {
-    if (!Array.isArray(element.bbox) || element.bbox.length !== 4) continue;
+  for (const [index, element] of layout.elements.entries()) {
+    if (!element || typeof element !== "object" || Array.isArray(element)
+      || !Array.isArray(element.bbox) || element.bbox.length !== 4) {
+      throw new ModelError(`${stem} element ${index} has incomplete layout bounds`);
+    }
     const [left, top, width, height] = element.bbox;
     if (![left, top, width, height].every(Number.isFinite) || width < 0 || height < 0 || left < -0.5 || top < -0.5 || left + width > 1280.5 || top + height > 720.5) {
       throw new ModelError(`${stem} element ${element.name || element.id} overflows the slide canvas`);
     }
-    if (typeof element.text === "string" && element.text.trim() && !String(element.name || "").startsWith("footer-")) {
-      if (!Number.isFinite(element.resolvedFontSize) || element.resolvedFontSize < 16) {
-        throw new ModelError(`${stem} element ${element.name || element.id} renders below 16pt`);
+    const authored = expected.get(element.name);
+    if (authored) {
+      if (observed.has(element.name) || element.text !== authored.text) {
+        throw new ModelError(`${stem} has missing, altered or duplicate authored text evidence`);
       }
-    }
-    if (String(element.name || "").startsWith("slide-title-") && element.textLayout?.lineCount !== 1) {
-      throw new ModelError(`${stem} title wraps unexpectedly`);
+      observed.add(element.name);
+      if (width <= 0 || height <= 0 || !Number.isFinite(element.resolvedFontSize)
+        || element.resolvedFontSize < 16) {
+        throw new ModelError(`${stem} authored text renders below 16pt or lacks usable bounds`);
+      }
+      const lines = element.textLayout?.lineCount;
+      if (!Number.isSafeInteger(lines) || lines < 1) {
+        throw new ModelError(`${stem} authored text lacks line-layout evidence`);
+      }
+      if (authored.singleLine && lines !== 1) throw new ModelError(`${stem} title wraps unexpectedly`);
+    } else if (typeof element.text === "string" && element.text.trim()) {
+      throw new ModelError(`${stem} contains unbound rendered text`);
     }
   }
+  if (observed.size !== expected.size) throw new ModelError(`${stem} is missing authored text evidence`);
 }
 
 async function createMontage(helperValue, pythonValue, qaPath, slideCount) {
@@ -1071,7 +1113,7 @@ async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt
     const rendered = await presentation.export({ slide, format: "png", scale: 1 });
     const layout = await slide.export({ format: "layout" });
     const layoutText = await layout.text();
-    validateLayout(layoutText, stem);
+    validateLayout(layoutText, stem, AUTHORED_TEXT.get(slide));
     if (qaPath) {
       await writeBlob(path.join(qaPath, `${stem}.png`), rendered);
       await fs.writeFile(path.join(qaPath, `${stem}.layout.json`), layoutText, { flag: "wx" });
@@ -1142,25 +1184,10 @@ async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt
 }
 
 async function readStableRegularFile(filename, field) {
-  let handle;
   try {
-    const pathInfo = await fs.lstat(filename);
-    if (!pathInfo.isFile() || pathInfo.isSymbolicLink()) throw new ModelError(`${field} must be a regular non-symlink file`);
-    handle = await fs.open(filename, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
-    const before = await handle.stat();
-    if (!before.isFile()) throw new ModelError(`${field} must be a regular non-symlink file`);
-    const data = await handle.readFile();
-    const after = await handle.stat();
-    if (pathInfo.dev !== before.dev || pathInfo.ino !== before.ino || data.length !== before.size || before.dev !== after.dev || before.ino !== after.ino
-      || before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
-      throw new ModelError(`${field} changed while being read`);
-    }
-    return { data, stat: after };
-  } catch (error) {
-    if (error instanceof ModelError) throw error;
-    throw new ModelError(`${field} must be a stable regular non-symlink file`);
-  } finally {
-    if (handle) await handle.close();
+    return await readDescriptorFile(filename, field);
+  } catch {
+    throw new ModelError(`${field} must be a stable bounded regular non-symlink file`);
   }
 }
 
@@ -1179,7 +1206,7 @@ async function qaBindings(qaPath) {
     if (name.includes("/") || name.includes("\\") || name === "." || name === "..") throw new ModelError("QA output contains an unsafe filename");
     const filename = path.join(qaPath, name);
     const { data, stat } = await readStableRegularFile(filename, `QA file ${name}`);
-    const pathInfo = await fs.lstat(filename);
+    const pathInfo = await fs.lstat(filename, { bigint: true });
     if (pathInfo.dev !== stat.dev || pathInfo.ino !== stat.ino) throw new ModelError(`QA file ${name} changed identity while being bound`);
     bindings.push({ file: name, sha256: sha256(data) });
   }
