@@ -107,8 +107,8 @@
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "842bfad45ebd2c693499dd2ba88e17287ba5df4ba5aaf59c5fc3db3248b1705e",
-      "size": 72054
+      "sha256": "fa018114e2ba944c3b7ec46aefb398fd8e5a230dcac52e52d78176c923b90297",
+      "size": 72135
     },
     {
       "path": "scripts/build_release_archive.py",

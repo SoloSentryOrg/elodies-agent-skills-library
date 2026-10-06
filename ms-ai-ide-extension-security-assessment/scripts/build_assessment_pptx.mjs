@@ -703,7 +703,8 @@ function setNotes(slide, model, sourceIds) {
 function addCover(presentation, model) {
   const slide = presentation.slides.add();
   slide.background.fill = "#FFFFFF";
-  addText(slide, "cover-kicker", "MICROSOFT IDE AI EXTENSION SECURITY ASSESSMENT", { left: 41, top: 42, width: 760, height: 52 }, 24, { color: "#3D8DFF", bold: true });
+  // Reserve room for both native-rendered lines without shrinking the heading.
+  addText(slide, "cover-kicker", "MICROSOFT IDE AI EXTENSION SECURITY ASSESSMENT", { left: 41, top: 42, width: 760, height: 100 }, 24, { color: "#3D8DFF", bold: true });
   addText(slide, "cover-title", model.assessment, { left: 41, top: 174, width: 1050, height: 260 }, 72, { bold: true, verticalAlignment: "bottom" });
   addText(slide, "cover-subtitle", `${model.publisher} · ${model.extension_id} · ${model.version} · ${model.ide_scope.join(" / ")}`, { left: 41, top: 490, width: 940, height: 105 }, 24, { color: "#303842" });
   addText(slide, "cover-control", `${model.assessment_date} · Document ${model.document_version} · PUBLIC`, { left: 41, top: 620, width: 800, height: 34 }, 18, { color: "#58616B" });
