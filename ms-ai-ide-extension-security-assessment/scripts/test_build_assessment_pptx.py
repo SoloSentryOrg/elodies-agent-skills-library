@@ -121,6 +121,55 @@ def valid_model() -> dict[str, object]:
 
 
 class AssessmentPptxTests(unittest.TestCase):
+    def test_v5_structure_preserves_authoring_and_requires_native_measurements(self) -> None:
+        probe = r'''
+          const fs = require("node:fs");
+          const vm = require("node:vm");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const start = source.indexOf("function validateV5Structure(");
+          const end = source.indexOf("\nfunction validateLayout(", start);
+          assert.ok(start >= 0 && end > start);
+          const check = vm.runInNewContext(`(${source.slice(start, end)})`, { ModelError: Error, Buffer }, { timeout: 1000 });
+          const expected = [{ name: "title", text: "Readable title", singleLine: true, bbox: [40, 40, 1200, 60] }];
+          const title = { name: "title", text: "Readable title", kind: "textbox", scope: "slide", editable: true,
+            position: { left: 40, top: 40, width: 1200, height: 60 }, style: { fontSize: 1 } };
+          const manifest = () => ({ schema: "openai.presentation.layout/v5", unit: "px",
+            slide: { position: { left: 0, top: 0, width: 1280, height: 720 } }, inheritedLayers: [], elements: [title] });
+          const invoke = (value, authoring = expected) => check(JSON.stringify(value), "test-slide", authoring);
+          const result = invoke(manifest());
+          assert.equal(result.nativeMeasurementsRequired, true);
+          assert.ok(Object.isFrozen(result));
+          // A nominal renderer font or missing line count cannot establish acceptance.
+          assert.equal(result.schema, "openai.presentation.layout/v5");
+          for (const change of [
+            { text: "Changed" }, { name: "renamed" }, { editable: false }, { kind: "shape" },
+            { position: { ...title.position, left: 41 } }, { children: [] },
+            { position: { left: 0, top: 0, width: 1281, height: 60 } },
+          ]) {
+            const value = manifest(); value.elements = [{ ...title, ...change }];
+            assert.throws(() => invoke(value));
+          }
+          const duplicate = manifest(); duplicate.elements.push({ ...title });
+          assert.throws(() => invoke(duplicate), /differs/);
+          const extra = manifest(); extra.elements.push({ ...title, name: "unreviewed", text: "Extra" });
+          assert.throws(() => invoke(extra), /unbound/);
+          const inherited = manifest(); inherited.inheritedLayers = [{ scope: "master", elements: [{ ...title, scope: "master", name: "hidden" }] }];
+          assert.throws(() => invoke(inherited), /unbound/);
+          const missing = manifest(); missing.elements = [{ kind: "shape", scope: "slide", position: title.position }];
+          assert.throws(() => invoke(missing), /missing authored/);
+          for (const value of [{ ...manifest(), unit: "pt" }, { ...manifest(), schema: "openai.presentation.layout/v4" },
+            { ...manifest(), slide: { position: { left: 0, top: 0, width: 960, height: 540 } } },
+            { ...manifest(), inheritedLayers: null },
+            { ...manifest(), inheritedLayers: [{ scope: "slide", elements: [] }] }]) assert.throws(() => invoke(value), /unsupported/);
+          const bounds = manifest(); bounds.elements = Array(4097).fill(title);
+          assert.throws(() => invoke(bounds), /exceeds bounds/);
+          assert.throws(() => check(" ".repeat(8 * 1024 * 1024 + 1), "oversized", expected), /oversized/);
+          assert.throws(() => invoke(manifest(), [{ ...expected[0], bbox: null }]), /invalid authored/);
+        '''
+        result = subprocess.run(["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_layout_gate_rejects_incomplete_rendering_evidence(self) -> None:
         """Exercise the actual guard with malformed evidence, not authored models."""
         probe = r'''
@@ -230,6 +279,10 @@ class AssessmentPptxTests(unittest.TestCase):
           assert.equal(expected[2].singleLine, false);
           assert.equal(expected[1].text, "Two lines\nExact body");
           assert.ok(expected.every(Object.isFrozen));
+          assert.ok(expected.every((item) => Object.isFrozen(item.bbox)));
+          assert.equal(JSON.stringify(expected[0].bbox), JSON.stringify([40, 40, 1200, 60]));
+          shapes[0].config.position.left = 0;
+          assert.equal(expected[0].bbox[0], 40);
           shapes[0].frame.value = "Renderer altered title";
           shapes[0].config.name = "footer-forged";
           assert.equal(expected[0].text, "Exact title");
@@ -854,6 +907,12 @@ class AssessmentPptxTests(unittest.TestCase):
                 "scripts/build_assessment_pptx.mjs",
                 "scripts/create_artifact_runtime_receipt.mjs",
                 "scripts/stable_regular_file.mjs",
+                "scripts/native_pptx_text.py",
+                "scripts/test_native_pptx_text.py",
+                "scripts/render_presentations_with_powerpoint.applescript",
+                "scripts/render_presentations_with_powerpoint.ps1",
+                "scripts/stage_office_artifact.py",
+                "scripts/test_powerpoint_path_identity.py",
                 "scripts/create_pptx_montage.py",
                 "scripts/portable_fs.py",
                 "scripts/requirements.lock",

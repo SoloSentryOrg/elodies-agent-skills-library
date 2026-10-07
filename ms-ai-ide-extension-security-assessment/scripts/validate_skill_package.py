@@ -28,6 +28,8 @@ REQUIRED_PATHS = {
     "scripts/build_release_archive.py",
     "scripts/create_artifact_runtime_receipt.mjs",
     "scripts/stable_regular_file.mjs",
+    "scripts/native_pptx_text.py",
+    "scripts/test_native_pptx_text.py",
     "scripts/test_stable_regular_file.mjs",
     "scripts/test_stable_regular_file.py",
     "scripts/create_pptx_montage.py",

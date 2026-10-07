@@ -99,6 +99,21 @@ on publishOutput(temporaryOutput, outputPath)
     end if
 end publishOutput
 
+on canonicalOfficePath(nativeFullName)
+    try
+        -- Office may report HFS paths or a /tmp alias for a /private/tmp file.
+        -- Resolve the full file identity; never select a document by basename.
+        if nativeFullName starts with "/" then
+            set nativePath to POSIX path of ((POSIX file nativeFullName) as alias)
+        else
+            set nativePath to POSIX path of (nativeFullName as alias)
+        end if
+        return do shell script "/bin/realpath " & quoted form of nativePath
+    on error
+        return ""
+    end try
+end canonicalOfficePath
+
 on run argv
     if (count of argv) is less than 5 or ((count of argv) - 3) mod 2 is not 0 then
         error "usage: render_reports_with_word.applescript OUTPUT_DIR PYTHON STAGER REPORT.docx SHA256 [...]"
@@ -128,22 +143,29 @@ on run argv
         end try
         set taskDirectory to missing value
         set my openedDocument to missing value
+        set openAttempted to false
+        set closeAttempted to false
+        set documentClosed to false
+        set stagedCanonicalPath to ""
         try
             set taskDirectory to createTaskDirectory(qaRoot)
             set stagedPath to stageReport(inputPath, expectedHash, taskDirectory, pythonPath, stagerPath)
             set temporaryOutput to taskDirectory & "/output.pdf"
+            set stagedCanonicalPath to canonicalOfficePath(stagedPath)
+            if stagedCanonicalPath is "" then error "Word staged document identity is unavailable"
             set stagedFile to POSIX file stagedPath
             with timeout of 600 seconds
                 tell application "Microsoft Word"
+                    set openAttempted to true
                     open stagedFile
                     set currentDocuments to every document
                     repeat with candidateDocument in currentDocuments
                         try
-                            set candidatePath to POSIX path of (full name of candidateDocument as alias)
+                            set candidatePath to my canonicalOfficePath((full name of candidateDocument) as text)
                         on error
                             set candidatePath to ""
                         end try
-                        if candidatePath is stagedPath then
+                        if candidatePath is stagedCanonicalPath then
                             set my openedDocument to candidateDocument
                             exit repeat
                         end if
@@ -157,7 +179,10 @@ on run argv
                     set reportPages to compute statistics (my openedDocument) statistic statistic pages
                     save as my openedDocument file name temporaryOutput file format format PDF
                     do shell script "/bin/test -s " & quoted form of temporaryOutput
+                    if my canonicalOfficePath((full name of my openedDocument) as text) is not stagedCanonicalPath then error "Word document identity changed before close"
+                    set closeAttempted to true
                     close my openedDocument saving no
+                    set documentClosed to true
                     set my openedDocument to missing value
                 end tell
             end timeout
@@ -166,14 +191,31 @@ on run argv
             set taskDirectory to missing value
             set end of renderedReports to reportStem & tab & (reportPages as text) & tab & outputPath
         on error errorMessage number errorNumber
-            tell application "Microsoft Word"
+            if my openedDocument is not missing value and not closeAttempted then
                 try
-                    close my openedDocument saving no
+                    with timeout of 10 seconds
+                        tell application "Microsoft Word"
+                            if my canonicalOfficePath((full name of my openedDocument) as text) is stagedCanonicalPath and stagedCanonicalPath is not "" then
+                                set closeAttempted to true
+                                close my openedDocument saving no
+                                set documentClosed to true
+                                set my openedDocument to missing value
+                            end if
+                        end tell
+                    end timeout
                 end try
-            end tell
-            try
-                cleanupTaskDirectory(taskDirectory, qaRoot)
-            end try
+            end if
+            -- An unresolved open may still have a native file-access prompt or
+            -- document referring to the private input. Never delete that input.
+            if not openAttempted or documentClosed then
+                try
+                    cleanupTaskDirectory(taskDirectory, qaRoot)
+                    set taskDirectory to missing value
+                end try
+            end if
+            if taskDirectory is not missing value then
+                set errorMessage to errorMessage & "; private QA stage retained at " & taskDirectory
+            end if
             error "Word render failed for " & inputPath & ": " & errorMessage number errorNumber
         end try
     end repeat

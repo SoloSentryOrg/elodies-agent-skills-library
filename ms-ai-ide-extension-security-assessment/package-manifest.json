@@ -107,8 +107,8 @@
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "fa018114e2ba944c3b7ec46aefb398fd8e5a230dcac52e52d78176c923b90297",
-      "size": 72135
+      "sha256": "5a78713943101b35261ecc59b62eab80a9e8ea0d9b1912421258093977f550bc",
+      "size": 76652
     },
     {
       "path": "scripts/build_release_archive.py",
@@ -151,6 +151,11 @@
       "size": 19744
     },
     {
+      "path": "scripts/native_pptx_text.py",
+      "sha256": "33686450a6e6ddd80835de892c61b427c793814c25fc7d03f6128ee708ddcaf9",
+      "size": 35683
+    },
+    {
       "path": "scripts/portable_fs.py",
       "sha256": "c4664cde1e52b0de9e7dc46413bc305270acd0f4be1a7b98e0a0f004c21835e7",
       "size": 10481
@@ -162,18 +167,18 @@
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.ps1",
-      "sha256": "c625537e3a187d91245e433b768d446ea4422a58f90ddb0ae87c0a4dadb3a2b8",
-      "size": 2723
+      "sha256": "57f816ca0400620100c2a05dfa54c7f5bad5f04f60ab1bb5dc9ec9170212930f",
+      "size": 5033
     },
     {
       "path": "scripts/render_reports_with_word.applescript",
-      "sha256": "6b7ea1d1437ab97a8bb4d2013a5f2e8bf575b41b95bf140027baa74611ddd839",
-      "size": 9509
+      "sha256": "463757b1b9880456364f9256a953552f9540110552a0ad7ffeea0e874d47fa4f",
+      "size": 11809
     },
     {
       "path": "scripts/render_reports_with_word.ps1",
-      "sha256": "6d0a6a68c1e6b963e78544329bb724c3ef629d9ec1231986be72e2c8add15382",
-      "size": 3280
+      "sha256": "dbb1ed343bc5d3c637e17eb9c881c74d7172eced41c2e36fb6efb9d859d7f886",
+      "size": 5757
     },
     {
       "path": "scripts/requirements.in",
@@ -222,8 +227,8 @@
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
-      "sha256": "b45dfcfb67e93eab2c0ed413184ff2c404bb5bdc33eb787b234a2ba670c9b73d",
-      "size": 44261
+      "sha256": "2835d5c67639bd39b0195541e726d563bafc804521d1ce72b5cb5597575a06c4",
+      "size": 48579
     },
     {
       "path": "scripts/test_create_word_qa_contact_sheets.py",
@@ -234,6 +239,11 @@
       "path": "scripts/test_inspect_vsix.py",
       "sha256": "2630b69838c18742dec17fba6b93727df317b31e7ba1e2968e8cd97ce926cef8",
       "size": 13789
+    },
+    {
+      "path": "scripts/test_native_pptx_text.py",
+      "sha256": "d39288cf7ef879c3b1ef3e197ccbb44746ea4396f279e13f5cface3db438842c",
+      "size": 30000
     },
     {
       "path": "scripts/test_portable_fs.py",
@@ -252,8 +262,8 @@
     },
     {
       "path": "scripts/test_powerpoint_path_identity.py",
-      "sha256": "2c006c8a35d5e30e8c09f0fd150a92e79ccf1ee6b6fbfddc186ecb1c34c06bf8",
-      "size": 2621
+      "sha256": "0761a8609c60f52e15ff9c6fdcd0287598e119f2a0edded4c8c14beb97c136ea",
+      "size": 8459
     },
     {
       "path": "scripts/test_stable_regular_file.mjs",
@@ -292,13 +302,13 @@
     },
     {
       "path": "scripts/validate_pptx_runtime_acceptance.py",
-      "sha256": "9fea54fb937e48d723d902131ebc3396a0291afdd1b29bb0b418751e6ed7f5ff",
-      "size": 2868
+      "sha256": "0ab7b01079cbb757ee21609ae6bc53fcbc3f44cd63dd18e736e42ca6d0cb2797",
+      "size": 3151
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "8e57113fdb87821b174e2a789ec1ae71b217c5dbb5bb9fd3c343aa1459bd2336",
-      "size": 8949
+      "sha256": "481c86012097de0bdcd465c95ace74734d900f540d77cdff4a29e5feb19631e4",
+      "size": 9024
     },
     {
       "path": "SKILL.md",

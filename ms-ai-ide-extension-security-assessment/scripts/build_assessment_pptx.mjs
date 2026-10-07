@@ -658,7 +658,8 @@ function addText(slide, name, value, position, fontSizePt, options = {}) {
   const expectations = AUTHORED_TEXT.get(slide) || [];
   if (expectations.length >= 4096) throw new ModelError("authored text count exceeds layout bounds");
   if (expectations.some((item) => item.name === name)) throw new ModelError("duplicate authored text name");
-  expectations.push(Object.freeze({ name, text: value, singleLine: name.startsWith("slide-title-") }));
+  expectations.push(Object.freeze({ name, text: value, singleLine: name.startsWith("slide-title-"),
+    bbox: Object.freeze([position.left, position.top, position.width, position.height]) }));
   AUTHORED_TEXT.set(slide, expectations);
   const shape = slide.shapes.add({
     geometry: "textbox",
@@ -1004,6 +1005,81 @@ async function loadArtifactTool(workspace, receiptFile, workspaceRoot, montageHe
 
 async function writeBlob(filename, blob) {
   await fs.writeFile(filename, new Uint8Array(await blob.arrayBuffer()), { flag: "wx", mode: 0o600 });
+}
+
+function validateV5Structure(layoutText, stem, authoredText) {
+  // Structure and authoring identity only. This cannot establish native font
+  // size or wrapping, and must never be substituted for final acceptance.
+  if (typeof layoutText !== "string" || Buffer.byteLength(layoutText, "utf8") > 8 * 1024 * 1024) {
+    throw new ModelError(`${stem} produced an oversized or invalid layout manifest`);
+  }
+  const layout = JSON.parse(layoutText);
+  const canvas = layout?.slide?.position;
+  if (layout?.schema !== "openai.presentation.layout/v5" || layout.unit !== "px"
+    || !canvas || canvas.left !== 0 || canvas.top !== 0 || canvas.width !== 1280 || canvas.height !== 720
+    || !Array.isArray(layout.elements) || !layout.elements.length
+    || !Array.isArray(layout.inheritedLayers) || layout.inheritedLayers.length > 8
+    || layout.inheritedLayers.some((layer) => !layer || !["layout", "master"].includes(layer.scope))) {
+    throw new ModelError(`${stem} produced an unsupported structural layout manifest`);
+  }
+  if (!Array.isArray(authoredText) || !authoredText.length || authoredText.length > 4096) {
+    throw new ModelError(`${stem} lacks bounded authored text expectations`);
+  }
+  const expected = new Map();
+  let authoredBytes = 0;
+  for (const item of authoredText) {
+    if (!item || typeof item.name !== "string" || !item.name || item.name.length > 256
+      || typeof item.text !== "string" || !item.text.trim() || Buffer.byteLength(item.text, "utf8") > 65536
+      || typeof item.singleLine !== "boolean" || !Array.isArray(item.bbox) || item.bbox.length !== 4
+      || !item.bbox.every(Number.isFinite) || expected.has(item.name)) {
+      throw new ModelError(`${stem} has invalid authored text expectations`);
+    }
+    authoredBytes += Buffer.byteLength(item.text, "utf8");
+    if (authoredBytes > 8 * 1024 * 1024) throw new ModelError(`${stem} authored text exceeds aggregate bounds`);
+    const [left, top, width, height] = item.bbox;
+    if (left < 0 || top < 0 || width <= 0 || height <= 0 || left + width > 1280 || top + height > 720) {
+      throw new ModelError(`${stem} authored frame exceeds canvas bounds`);
+    }
+    expected.set(item.name, item);
+  }
+  const layers = [{ scope: "slide", elements: layout.elements }, ...layout.inheritedLayers];
+  const observed = new Set();
+  let count = 0;
+  for (const layer of layers) {
+    if (!layer || !["slide", "layout", "master"].includes(layer.scope) || !Array.isArray(layer.elements)) {
+      throw new ModelError(`${stem} has unsupported inherited layout evidence`);
+    }
+    count += layer.elements.length;
+    if (count > 4096) throw new ModelError(`${stem} structural element collection exceeds bounds`);
+    for (const element of layer.elements) {
+      const position = element?.position;
+      if (!element || typeof element !== "object" || Array.isArray(element) || !position
+        || element.scope !== layer.scope || typeof element.kind !== "string" || !element.kind
+        || Object.hasOwn(element, "elements") || Object.hasOwn(element, "children")) {
+        throw new ModelError(`${stem} has incomplete or nested structural evidence`);
+      }
+      const bbox = [position.left, position.top, position.width, position.height];
+      const [left, top, width, height] = bbox;
+      if (!bbox.every(Number.isFinite) || width < 0 || height < 0 || left < -0.5 || top < -0.5
+        || left + width > 1280.5 || top + height > 720.5) {
+        throw new ModelError(`${stem} structural element exceeds canvas bounds`);
+      }
+      const authored = expected.get(element.name);
+      if (authored) {
+        if (layer.scope !== "slide" || element.kind !== "textbox" || element.editable !== true
+          || observed.has(element.name) || element.text !== authored.text
+          || bbox.some((value, index) => Math.abs(value - authored.bbox[index]) > 0.000001)) {
+          throw new ModelError(`${stem} structural text differs from immutable authoring`);
+        }
+        observed.add(element.name);
+      } else if (element.kind === "textbox" || (Object.hasOwn(element, "text")
+        && (typeof element.text !== "string" || element.text.trim()))) {
+        throw new ModelError(`${stem} contains unbound structural text`);
+      }
+    }
+  }
+  if (observed.size !== expected.size) throw new ModelError(`${stem} is missing authored text evidence`);
+  return Object.freeze({ schema: layout.schema, nativeMeasurementsRequired: true });
 }
 
 function validateLayout(layoutText, stem, authoredText) {
