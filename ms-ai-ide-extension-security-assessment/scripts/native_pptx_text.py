@@ -196,7 +196,14 @@ def _parser_bytes(path: Path) -> bytes:
             raise NativeTextError("native parser file grew during snapshot")
         after = os.fstat(descriptor); leaf = path.lstat()
         identity = lambda value: (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, value.st_ctime_ns)
-        if identity(before) != identity(after) or identity(after) != identity(leaf) or stat.S_ISLNK(leaf.st_mode) or getattr(leaf, "st_file_attributes", 0) & 0x400:
+        def path_identity(value):
+            # Windows Python 3.12 fstat exposes change time in ctime, while
+            # path stat preserves creation time there. Compare birthtime
+            # across the two APIs; retain full change-time checks above/below.
+            timestamp = (getattr(value, "st_birthtime_ns", value.st_ctime_ns)
+                         if os.name == "nt" else value.st_ctime_ns)
+            return (value.st_dev, value.st_ino, value.st_size, value.st_mtime_ns, timestamp)
+        if identity(before) != identity(after) or path_identity(after) != path_identity(leaf) or stat.S_ISLNK(leaf.st_mode) or getattr(leaf, "st_file_attributes", 0) & 0x400:
             raise NativeTextError("native parser file identity changed during snapshot")
         return b"".join(chunks)
     finally:

@@ -380,6 +380,40 @@ m['_worker']()
             path.write_bytes(payload)
             self.assertEqual(native_module._parser_bytes(path), payload)
 
+    def test_windows_snapshot_compares_equivalent_timestamps_and_rejects_changes(self):
+        from types import SimpleNamespace
+        payload = b"known fixture\r\n\x1a"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "parser.bin"
+            path.write_bytes(payload)
+            observed = path.stat()
+            fields = {name: getattr(observed, name) for name in
+                      ("st_dev", "st_ino", "st_size", "st_mode", "st_mtime_ns", "st_ctime_ns")}
+            for case in ("stable", "changed-during-read", "replaced-path", "changed-path-mtime", "changed-path-birth", "legacy"):
+                before = dict(fields, st_ctime_ns=200, st_birthtime_ns=100)
+                after = dict(before)
+                leaf = dict(fields, st_ctime_ns=100, st_birthtime_ns=100)
+                if case == "changed-during-read":
+                    after["st_ctime_ns"] = 300
+                elif case == "replaced-path":
+                    leaf["st_ino"] += 1
+                elif case == "changed-path-mtime":
+                    leaf["st_mtime_ns"] += 1
+                elif case == "changed-path-birth":
+                    leaf["st_birthtime_ns"] += 1
+                elif case == "legacy":
+                    for metadata in (before, after, leaf):
+                        metadata.pop("st_birthtime_ns")
+                        metadata["st_ctime_ns"] = 100
+                with self.subTest(case=case), mock.patch.object(native_module.os, "name", "nt"), \
+                        mock.patch.object(native_module.os, "fstat", side_effect=[SimpleNamespace(**before), SimpleNamespace(**after)]), \
+                        mock.patch.object(type(path), "lstat", return_value=SimpleNamespace(**leaf)):
+                    if case in ("stable", "legacy"):
+                        self.assertEqual(native_module._parser_bytes(path), payload)
+                    else:
+                        with self.assertRaisesRegex(NativeTextError, "identity changed"):
+                            native_module._parser_bytes(path)
+
     def test_verified_snapshot_excludes_substituted_installed_bytecode(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); installed = root / "installed"; stage = root / "snapshot"; stage.mkdir()
