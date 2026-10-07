@@ -177,7 +177,8 @@ def _parser_policy(policy: object) -> bytes:
 
 
 def _parser_bytes(path: Path) -> bytes:
-    flags = os.O_RDONLY | getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0)
+    flags = (os.O_RDONLY | getattr(os, "O_BINARY", 0) |
+             getattr(os, "O_NOFOLLOW", 0) | getattr(os, "O_NONBLOCK", 0))
     if os.name == "posix" and (not hasattr(os, "O_NOFOLLOW") or not hasattr(os, "O_NONBLOCK")):
         raise NativeTextError("native parser file safeguards are unavailable")
     descriptor = os.open(path, flags)

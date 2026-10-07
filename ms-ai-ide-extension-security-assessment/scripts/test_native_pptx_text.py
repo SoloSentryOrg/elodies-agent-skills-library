@@ -339,7 +339,10 @@ m['_worker']()
             with self.subTest(host=host), mock.patch.object(native_module.os, "name", "posix"), \
                     mock.patch.object(native_module.sys, "platform", host), \
                     mock.patch.object(native_module, "_parser_policy", return_value=b"test-only-policy"), \
+                    mock.patch.object(native_module, "Path") as executable_path, \
                     mock.patch.object(native_module.subprocess, "Popen") as launch:
+                executable_path.return_value.is_absolute.return_value = True
+                executable_path.return_value.is_file.return_value = True
                 with self.assertRaisesRegex(NativeTextError, "memory-contained runner"):
                     validate_native_pdf_bounded(native_pdf(), [authored], parser_identity={})
                 launch.assert_not_called()
@@ -370,6 +373,13 @@ m['_worker']()
             set_limit.assert_any_call(resource.RLIMIT_AS, (native_module.MAX_WORKER_MEMORY_BYTES,) * 2)
             incoming.buffer.read.assert_not_called()
 
+    def test_parser_snapshot_preserves_crlf_and_control_bytes(self):
+        payload = b"source\r\n\x1a\x00binary\r\nend"
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / "parser.bin"
+            path.write_bytes(payload)
+            self.assertEqual(native_module._parser_bytes(path), payload)
+
     def test_verified_snapshot_excludes_substituted_installed_bytecode(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); installed = root / "installed"; stage = root / "snapshot"; stage.mkdir()
@@ -396,7 +406,8 @@ m['_worker']()
             script = Path(__file__).with_name("native_pptx_text.py")
             probe = "import runpy,sys,json,pathlib; m=runpy.run_path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); m['_stage_parser'](json.loads(pathlib.Path(sys.argv[3]).read_text()),pathlib.Path(sys.argv[4])); import pypdfium2; print(pypdfium2.MARKER)"
             result = subprocess.run([sys.executable, "-I", "-B", "-c", probe, str(script), str(installed), str(path), str(stage)],
-                                    capture_output=True, text=True, timeout=10, check=True)
+                                    capture_output=True, text=True, timeout=10)
+            self.assertEqual(result.returncode, 0, result.stderr)
             self.assertEqual(result.stdout.strip(), "reviewed!")
             self.assertFalse(list(stage.rglob("*.pyc")))
 
