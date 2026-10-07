@@ -242,8 +242,8 @@
     },
     {
       "path": "scripts/test_native_pptx_text.py",
-      "sha256": "7fe57e8fd3662034e5f7c971508d55b16bae40999fce0f6426e0ea6f0f203ea0",
-      "size": 30628
+      "sha256": "efdc40c8a42aec5f470bbf67d61d74039e2ce8f93188a8481d3b37550f0c94a6",
+      "size": 31305
     },
     {
       "path": "scripts/test_portable_fs.py",

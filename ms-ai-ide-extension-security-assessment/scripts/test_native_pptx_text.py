@@ -404,7 +404,27 @@ m['_worker']()
                       "distribution_version": "1.0.0", "pdfium_version": "1.0.1.0", "native_flags": [], "files": files}
             path = root / "identity.json"; path.write_text(json.dumps(policy))
             script = Path(__file__).with_name("native_pptx_text.py")
-            probe = "import runpy,sys,json,pathlib; m=runpy.run_path(sys.argv[1]); sys.path.insert(0,sys.argv[2]); m['_stage_parser'](json.loads(pathlib.Path(sys.argv[3]).read_text()),pathlib.Path(sys.argv[4])); import pypdfium2; print(pypdfium2.MARKER)"
+            probe = r'''
+import json, pathlib, runpy, sys
+m = runpy.run_path(sys.argv[1])
+sys.path.insert(0, sys.argv[2])
+def trace(frame, event, argument):
+    # Only metadata of this owned fixture, at the original rejection site.
+    # Never alter the reader, exception, file bytes or acceptance result.
+    if event == 'exception' and frame.f_code.co_name == '_parser_bytes':
+        names = ('st_dev', 'st_ino', 'st_size', 'st_mtime_ns', 'st_ctime_ns')
+        observed = {key: {name: getattr(frame.f_locals[key], name) for name in names}
+                    for key in ('before', 'after', 'leaf') if key in frame.f_locals}
+        print(json.dumps({'fixture_snapshot_metadata': observed}), file=sys.stderr)
+    return trace
+sys.settrace(trace)
+try:
+    m['_stage_parser'](json.loads(pathlib.Path(sys.argv[3]).read_text()), pathlib.Path(sys.argv[4]))
+finally:
+    sys.settrace(None)
+import pypdfium2
+print(pypdfium2.MARKER)
+'''
             result = subprocess.run([sys.executable, "-I", "-B", "-c", probe, str(script), str(installed), str(path), str(stage)],
                                     capture_output=True, text=True, timeout=10)
             self.assertEqual(result.returncode, 0, result.stderr)
