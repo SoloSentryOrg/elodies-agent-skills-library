@@ -157,8 +157,8 @@
     },
     {
       "path": "scripts/native_pptx_text.py",
-      "sha256": "71d334a505d6ab85b635497f5ba3e508b413eecde843321b0318b54f63541456",
-      "size": 38576
+      "sha256": "19c5239eedb634febca78bc62e4a7fe377fb083f0cb1ec705595b5b166e31257",
+      "size": 38612
     },
     {
       "path": "scripts/portable_fs.py",

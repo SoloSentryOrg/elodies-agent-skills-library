@@ -562,7 +562,7 @@ def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, objec
             finally:
                 _reap_owned_worker(process)  # Kill/reap before output or stage cleanup.
             if process.returncode != 0:
-                raise NativeTextError("native parser rejected the request")
+                raise NativeTextError(f"native parser rejected the request (exit status {process.returncode})")
             if not 0 < os.fstat(outgoing.fileno()).st_size <= MAX_RESULT_BYTES:
                 raise NativeTextError("native parser output is missing or exceeds bounds")
             outgoing.seek(0); raw = outgoing.read(MAX_RESULT_BYTES + 1)
