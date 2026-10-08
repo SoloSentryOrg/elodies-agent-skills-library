@@ -14,6 +14,7 @@ import signal
 import subprocess
 from pathlib import Path
 import tempfile
+import time
 import sys
 import unittest
 from unittest import mock
@@ -396,9 +397,51 @@ m['_worker']()
         self.assertEqual(result.stdout.strip(), "owned CPU limit active", result.stderr)
         if sys.platform == "win32":
             # Job quota termination, not an arbitrary crash or Python failure.
-            self.assertEqual(result.returncode, 1816, result.stderr)  # ERROR_NOT_ENOUGH_QUOTA
+            self.assertEqual(result.returncode & 0xFFFFFFFF, 0xC0000044, result.stderr)  # STATUS_QUOTA_EXCEEDED
         else:
             self.assertIn(result.returncode, (-signal.SIGKILL, -signal.SIGXCPU), result.stderr)
+
+    @unittest.skipUnless(sys.platform.startswith("linux"), "requires Linux non-reaping wait and session cleanup")
+    def test_early_exit_worker_cleanup_spares_separate_sentinel(self):
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / "owned-child.pid"
+            code = "import os,sys,time; pid=os.fork(); " + \
+                   "(time.sleep(30) if pid==0 else (open(sys.argv[1],'w').write(str(pid)),os._exit(0)))"
+            sentinel = subprocess.Popen([sys.executable, "-I", "-B", "-c", "import time; time.sleep(30)"],
+                                        stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+            leader = subprocess.Popen([sys.executable, "-I", "-B", "-c", code, str(marker)],
+                                      stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                                      start_new_session=True)
+            reaped = False
+            try:
+                deadline = time.monotonic() + 5
+                while not native_module._owned_worker_exited(leader):
+                    self.assertLess(time.monotonic(), deadline, "owned leader did not exit")
+                    time.sleep(.01)
+                self.assertIsNone(leader.returncode, "leader was prematurely reaped")
+                child_pid = int(marker.read_text())
+                native_module._reap_owned_worker(leader)
+                reaped = True
+                self.assertEqual(leader.returncode, 0)
+                deadline = time.monotonic() + 5
+                while True:
+                    try:
+                        state = Path(f"/proc/{child_pid}/stat").read_text().rsplit(")", 1)[1].split()[0]
+                    except FileNotFoundError:
+                        break
+                    if state == "Z":
+                        break  # Terminated; its OS reaper owns the orphan zombie.
+                    self.assertLess(time.monotonic(), deadline, "owned descendant survived group cleanup")
+                    time.sleep(.01)
+                self.assertIsNone(sentinel.poll(), "unrelated sentinel was signalled")
+                with self.assertRaises(ChildProcessError):
+                    native_module._reap_owned_worker(leader)  # Refuse a reaped/reusable PID.
+            finally:
+                if not reaped:
+                    native_module._reap_owned_worker(leader)
+                if sentinel.poll() is None:
+                    sentinel.kill()
+                sentinel.wait()
 
     def test_unsupported_host_rejects_before_worker_launch(self):
         _, authored = fixture()

@@ -455,6 +455,30 @@ def validate_native_page(page: dict[str, object], authored: list[dict[str, objec
     return results
 
 
+def _owned_worker_exited(process: subprocess.Popen) -> bool:
+    # This coordinator exclusively owns child waiting; external SIGCHLD
+    # handlers/threads must not reap its private Popen worker.
+    if sys.platform.startswith("linux"):
+        # WNOWAIT reserves the owned leader's PID until group cleanup, even
+        # after early exit. Popen.poll() would reap it and permit PID reuse.
+        observed = os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        return observed is not None
+    return process.poll() is not None
+
+
+def _reap_owned_worker(process: subprocess.Popen) -> None:
+    if sys.platform.startswith("linux"):
+        # Only callers that retain the session leader unreaped may use this.
+        os.waitid(os.P_PID, process.pid, os.WEXITED | os.WNOHANG | os.WNOWAIT)
+        try:
+            os.killpg(process.pid, signal.SIGKILL)
+        except ProcessLookupError:
+            pass
+    elif process.poll() is None:
+        process.kill()
+    process.wait()
+
+
 def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, object]]],
                                 *, parser_identity: dict[str, object] | None = None,
                                 python_executable: str = sys.executable,
@@ -529,27 +553,19 @@ def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, objec
                                        start_new_session=os.name == "posix")
             deadline = time.monotonic() + timeout
             try:
-                while process.poll() is None:
+                while not _owned_worker_exited(process):
                     if os.fstat(outgoing.fileno()).st_size > MAX_RESULT_BYTES:
                         raise NativeTextError("native parser output exceeds byte bounds")
                     if time.monotonic() >= deadline:
                         raise NativeTextError("native parser deadline expired")
                     time.sleep(min(.02, max(0, deadline - time.monotonic())))
-                if process.returncode != 0:
-                    raise NativeTextError("native parser rejected the request")
-                if not 0 < os.fstat(outgoing.fileno()).st_size <= MAX_RESULT_BYTES:
-                    raise NativeTextError("native parser output is missing or exceeds bounds")
-                outgoing.seek(0); raw = outgoing.read(MAX_RESULT_BYTES + 1)
             finally:
-                if process.poll() is None:
-                    if os.name == "posix":
-                        try:
-                            os.killpg(process.pid, signal.SIGKILL)
-                        except ProcessLookupError:
-                            pass  # The owned worker exited between poll and kill.
-                    else:
-                        process.kill()
-                process.wait()  # Reap the exact owned process before stage cleanup.
+                _reap_owned_worker(process)  # Kill/reap before output or stage cleanup.
+            if process.returncode != 0:
+                raise NativeTextError("native parser rejected the request")
+            if not 0 < os.fstat(outgoing.fileno()).st_size <= MAX_RESULT_BYTES:
+                raise NativeTextError("native parser output is missing or exceeds bounds")
+            outgoing.seek(0); raw = outgoing.read(MAX_RESULT_BYTES + 1)
     try:
         measured = json.loads(raw)
     except (ValueError, UnicodeError) as exc:
