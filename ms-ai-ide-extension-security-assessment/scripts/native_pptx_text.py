@@ -463,7 +463,8 @@ def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, objec
 
     This is process separation and resource bounding, not an OS security
     sandbox. Production callers must separately approve and bind the installed
-    parser. Linux adds CPU/output/address-space limits.
+    parser. Linux adds CPU/output/address-space and child/thread creation limits
+    for unprivileged workers with no capability or exec privilege gain.
     Windows requires a verified self-owned Job Object before reading the PDF,
     with CPU, committed-memory and active-process limits.
     Other hosts reject this worker until an approved memory-contained runner
@@ -575,6 +576,34 @@ def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, objec
     return measured
 
 
+def _deny_linux_worker_children() -> None:
+    """Deny fork/thread creation only in this unprivileged Linux worker.
+
+    RLIMIT_NPROC does not constrain root or capability-privileged callers.
+    no_new_privs prevents gaining exec-based privileges after this check.
+    These limits are resource controls, not a complete security sandbox.
+    """
+    import resource
+    if any(uid == 0 for uid in os.getresuid()):
+        raise NativeTextError("Linux parser worker requires unprivileged user identities")
+    with open("/proc/self/status", "rb") as status:
+        snapshot = status.read(8193)
+    if len(snapshot) > 8192:
+        raise NativeTextError("Linux worker privilege evidence exceeds bounds")
+    for field in (b"CapInh", b"CapPrm", b"CapEff", b"CapAmb"):
+        values = re.findall(rb"^" + field + rb":\s*([0-9a-fA-F]{16})$", snapshot, re.MULTILINE)
+        if len(values) != 1 or int(values[0], 16) != 0:
+            raise NativeTextError("Linux parser worker requires zero privilege capabilities")
+    libc = ctypes.CDLL(None, use_errno=True)
+    libc.prctl.argtypes = [ctypes.c_int, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong, ctypes.c_ulong]
+    libc.prctl.restype = ctypes.c_int
+    if libc.prctl(38, 1, 0, 0, 0) != 0 or libc.prctl(39, 0, 0, 0, 0) != 1:
+        raise NativeTextError("Linux worker no-new-privileges enforcement is unavailable")
+    resource.setrlimit(resource.RLIMIT_NPROC, (0, 0))
+    if resource.getrlimit(resource.RLIMIT_NPROC) != (0, 0):
+        raise NativeTextError("Linux worker child-limit readback differs from requested bounds")
+
+
 def _worker() -> None:
     _require_memory_contained_worker_platform()
     windows_job = None
@@ -589,6 +618,7 @@ def _worker() -> None:
             resource.setrlimit(resource.RLIMIT_AS, (MAX_WORKER_MEMORY_BYTES, MAX_WORKER_MEMORY_BYTES))
             if resource.getrlimit(resource.RLIMIT_AS) != (MAX_WORKER_MEMORY_BYTES, MAX_WORKER_MEMORY_BYTES):
                 raise NativeTextError("native worker memory-limit readback differs from requested bounds")
+            _deny_linux_worker_children()
     prefix = sys.stdin.buffer.read(4)
     if len(prefix) != 4:
         raise NativeTextError("native request header is missing")

@@ -10,6 +10,7 @@ import math
 import os
 import platform
 import py_compile
+import signal
 import subprocess
 from pathlib import Path
 import tempfile
@@ -295,6 +296,31 @@ print(json.dumps({'flags': limits.BasicLimitInformation.LimitFlags,
                                                    "memory_blocked": True, "child_blocked": True})
 
 
+class LinuxWorkerPrivilegeTests(unittest.TestCase):
+    @unittest.skipUnless(os.name == "posix", "POSIX resource API")
+    def test_root_capabilities_and_unverifiable_limits_reject(self):
+        import resource
+        clean = b"CapInh:\t0000000000000000\nCapPrm:\t0000000000000000\nCapEff:\t0000000000000000\nCapAmb:\t0000000000000000\n"
+        cases = [
+            ((0, 1001, 1001), clean, [0, 1], (0, 0), "unprivileged"),
+            ((1001, 1001, 1001), clean.replace(b"CapPrm:\t0000000000000000", b"CapPrm:\t0000000001000000"), [0, 1], (0, 0), "capabilities"),
+            ((1001, 1001, 1001), clean.replace(b"CapAmb:", b"Missing:"), [0, 1], (0, 0), "capabilities"),
+            ((1001, 1001, 1001), clean, [-1], (0, 0), "no-new-privileges"),
+            ((1001, 1001, 1001), clean, [0, 0], (0, 0), "no-new-privileges"),
+            ((1001, 1001, 1001), clean, [0, 1], (1, 1), "child-limit"),
+        ]
+        for uids, data, calls, observed, error in cases:
+            with self.subTest(error=error), \
+                 mock.patch.object(native_module.os, "getresuid", return_value=uids, create=True), \
+                 mock.patch("builtins.open", mock.mock_open(read_data=data)), \
+                 mock.patch.object(native_module.ctypes, "CDLL") as load, \
+                 mock.patch.object(resource, "setrlimit"), \
+                 mock.patch.object(resource, "getrlimit", return_value=observed):
+                load.return_value.prctl.side_effect = calls
+                with self.assertRaisesRegex(NativeTextError, error):
+                    native_module._deny_linux_worker_children()
+
+
 class NativeMeasurementTests(unittest.TestCase):
     @unittest.skipUnless(sys.platform.startswith("linux"), "requires actual Linux address-space enforcement")
     def test_native_linux_worker_denies_mapping_before_request_read(self):
@@ -302,13 +328,22 @@ class NativeMeasurementTests(unittest.TestCase):
         # Probe only an owned child. PROT_NONE reserves address space without
         # touching physical memory if a regressed worker permits the mapping.
         probe = r'''
-import errno, json, mmap, resource, runpy, sys
+import errno, json, mmap, resource, runpy, subprocess, sys
 m = runpy.run_path(sys.argv[1])
 class BeforeRequest:
     def read(self, size):
         assert size == 4
         limit = m['MAX_WORKER_MEMORY_BYTES']
         assert resource.getrlimit(resource.RLIMIT_AS) == (limit, limit)
+        assert resource.getrlimit(resource.RLIMIT_NPROC) == (0, 0)
+        try:
+            child = subprocess.Popen([sys.executable, "-I", "-B", "-c", "raise SystemExit(0)"],
+                                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        except OSError as exc:
+            child_denied = exc.errno == errno.EAGAIN
+        else:
+            child.wait(timeout=5)
+            child_denied = False
         try:
             mapping = mmap.mmap(-1, 2 * limit, prot=0)
         except OSError as exc:
@@ -318,6 +353,7 @@ class BeforeRequest:
             denied = False
         print(json.dumps({'address_space_bytes': limit,
                           'mapping_denied': denied,
+                          'child_creation_denied': child_denied,
                           'before_request_consumption': True}))
         raise SystemExit(0)
 class Incoming:
@@ -331,7 +367,38 @@ m['_worker']()
         self.assertEqual(result.returncode, 0, result.stderr)
         self.assertEqual(json.loads(result.stdout), {"address_space_bytes": 1024 ** 3,
                                                    "mapping_denied": True,
+                                                   "child_creation_denied": True,
                                                    "before_request_consumption": True})
+
+    @unittest.skipUnless(sys.platform.startswith("linux") or sys.platform == "win32", "requires native worker CPU enforcement")
+    def test_native_cpu_limit_terminates_owned_busy_worker(self):
+        script = Path(__file__).with_name("native_pptx_text.py").resolve()
+        probe = r'''
+import runpy, sys
+m = runpy.run_path(sys.argv[1])
+m['_worker'].__globals__['MAX_WORKER_CPU_SECONDS'] = 1
+class Busy:
+    def read(self, size):
+        print('owned CPU limit active', flush=True)
+        while True:
+            pass
+class Incoming:
+    buffer = Busy()
+sys.stdin = Incoming()
+m['_worker']()
+'''
+        environment = {"PATH": str(Path(sys.executable).parent)}
+        for key in ("SystemRoot", "WINDIR"):
+            if key in os.environ:
+                environment[key] = os.environ[key]
+        result = subprocess.run([sys.executable, "-I", "-B", "-c", probe, str(script)],
+                                capture_output=True, text=True, env=environment, timeout=10)
+        self.assertEqual(result.stdout.strip(), "owned CPU limit active", result.stderr)
+        if sys.platform == "win32":
+            # Job quota termination, not an arbitrary crash or Python failure.
+            self.assertEqual(result.returncode, 1816, result.stderr)  # ERROR_NOT_ENOUGH_QUOTA
+        else:
+            self.assertIn(result.returncode, (-signal.SIGKILL, -signal.SIGXCPU), result.stderr)
 
     def test_unsupported_host_rejects_before_worker_launch(self):
         _, authored = fixture()

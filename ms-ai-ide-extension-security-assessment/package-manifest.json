@@ -152,8 +152,8 @@
     },
     {
       "path": "scripts/native_pptx_text.py",
-      "sha256": "e23269d4ace7f432a84124f6eaf842b016108d3e48ea7a90be1e54cecbaf9f23",
-      "size": 36238
+      "sha256": "9e41aff03f2a982191d3da19a76ec094853ef8c010aa08711da72f400f1cd86f",
+      "size": 37957
     },
     {
       "path": "scripts/portable_fs.py",
@@ -242,8 +242,8 @@
     },
     {
       "path": "scripts/test_native_pptx_text.py",
-      "sha256": "64307523cb92a505800b395439ecab2b671e670e1c89ef57b260eee40ea948c6",
-      "size": 33379
+      "sha256": "6ca7e38ba96d66979f49925ce253f0cf9d95830b457384957f21ddaf9f84f66a",
+      "size": 36979
     },
     {
       "path": "scripts/test_portable_fs.py",
