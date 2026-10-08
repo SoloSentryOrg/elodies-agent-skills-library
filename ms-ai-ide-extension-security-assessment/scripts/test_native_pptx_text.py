@@ -349,7 +349,94 @@ class LinuxWorkerPrivilegeTests(unittest.TestCase):
                     native_module._deny_linux_worker_children()
 
 
+class BoundedDiagnosticPipeTests(unittest.TestCase):
+    def capture_fast_exit(self, payload):
+        # Below anonymous-pipe capacity: exit before any parent read.
+        code = "import os,sys; os.write(2, bytes.fromhex(sys.argv[1])); raise SystemExit(1)"
+        child = subprocess.Popen([sys.executable, "-I", "-B", "-c", code, payload.hex()],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                 start_new_session=os.name == "posix")
+        reader = native_module._BoundedWorkerDiagnostics(child.stderr)
+        try:
+            deadline = time.monotonic() + 5
+            while not native_module._owned_worker_exited(child):
+                if time.monotonic() >= deadline:
+                    self.fail("diagnostic fixture did not exit")
+                time.sleep(.01)
+            native_module._reap_owned_worker(child)
+            reader.finish()
+            self.assertTrue(reader.eof)
+            self.assertEqual(child.returncode, 1)
+            return reader
+        finally:
+            if child.returncode is None:
+                native_module._reap_owned_worker(child)
+            child.stderr.close()
+
+    def test_fast_exit_preserves_only_allowed_failure_context(self):
+        payload = b'{"failureStage":"parser-snapshot","failureType":"ImportError"}'
+        reader = self.capture_fast_exit(payload)
+        self.assertFalse(reader.overflow)
+        self.assertEqual(bytes(reader.data), payload)
+        self.assertEqual(native_module._safe_worker_failure(bytes(reader.data)),
+                         "; stage parser-snapshot; type ImportError")
+
+    def test_fast_exit_oversized_stderr_is_capped_and_marked(self):
+        reader = self.capture_fast_exit(b"private PDF text " * 128)
+        self.assertTrue(reader.overflow)
+        self.assertEqual(len(reader.data), native_module.MAX_FAILURE_BYTES)
+        self.assertEqual(native_module._safe_worker_failure(bytes(reader.data)), "")
+
+    def test_active_oversized_writer_is_drained_capped_and_reaped(self):
+        child = subprocess.Popen([sys.executable, "-I", "-B", "-c",
+                                  "import os; os.write(2, b'x' * (1024 * 1024))"],
+                                 stdout=subprocess.DEVNULL, stderr=subprocess.PIPE,
+                                 start_new_session=os.name == "posix")
+        reader = native_module._BoundedWorkerDiagnostics(child.stderr)
+        try:
+            deadline = time.monotonic() + 5
+            while not reader.overflow:
+                reader.drain()
+                if time.monotonic() >= deadline:
+                    self.fail("oversized fixture did not produce overflow")
+                time.sleep(.01)
+            native_module._reap_owned_worker(child)
+            reader.finish()
+            self.assertTrue(reader.eof)
+            self.assertEqual(len(reader.data), native_module.MAX_FAILURE_BYTES)
+            self.assertIsNotNone(child.returncode)
+        finally:
+            if child.returncode is None:
+                native_module._reap_owned_worker(child)
+            child.stderr.close()
+
+    def test_retained_writer_cannot_extend_reader_lifecycle(self):
+        incoming, outgoing = os.pipe()
+        with os.fdopen(incoming, "rb", buffering=0) as stream:
+            try:
+                reader = native_module._BoundedWorkerDiagnostics(stream)
+                started = time.monotonic()
+                with self.assertRaisesRegex(NativeTextError, "did not close after cleanup"):
+                    reader.finish()
+                self.assertLess(time.monotonic() - started, 1)
+                self.assertEqual(reader.data, b"")
+            finally:
+                os.close(outgoing)
+
+
 class NativeMeasurementTests(unittest.TestCase):
+    def test_failed_worker_context_is_bounded_and_never_reflects_messages(self):
+        safe = b'{"failureStage":"parser-extraction","failureType":"MemoryError"}'
+        self.assertEqual(native_module._safe_worker_failure(safe),
+                         "; stage parser-extraction; type MemoryError")
+        for raw in (b"private native stderr", b"x" * 1025,
+                    b'{"failureStage":"/private/report","failureType":"MemoryError"}',
+                    b'{"failureStage":"request","failureType":"secret"}',
+                    b'{"failureStage":[],"failureType":"MemoryError"}',
+                    b'{"failureStage":"request","failureType":"MemoryError","message":"private PDF"}'):
+            with self.subTest(raw=raw[:64]):
+                self.assertEqual(native_module._safe_worker_failure(raw), "")
+
     @unittest.skipUnless(sys.platform.startswith("linux"), "requires actual Linux address-space enforcement")
     def test_native_linux_worker_denies_mapping_before_request_read(self):
         script = Path(__file__).with_name("native_pptx_text.py").resolve()

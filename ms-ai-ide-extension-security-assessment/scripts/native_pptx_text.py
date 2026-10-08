@@ -43,6 +43,10 @@ MAX_PARSER_FILE_BYTES = 32 * 1024 * 1024
 MAX_PARSER_TOTAL_BYTES = 64 * 1024 * 1024
 MAX_WORKER_MEMORY_BYTES = 1024 * 1024 * 1024
 MAX_WORKER_CPU_SECONDS = 60
+MAX_FAILURE_BYTES = 1024
+_WORKER_FAILURE_STAGE = "startup"
+_WORKER_FAILURE_STAGES = frozenset({"startup", "limits", "request", "parser-snapshot", "parser-extraction", "text-validation", "result"})
+_WORKER_FAILURE_TYPES = frozenset({"NativeTextError", "MemoryError", "OSError", "ImportError", "ValueError", "TypeError", "WorkerError"})
 
 
 class _WindowsBasicLimits(ctypes.Structure):
@@ -479,6 +483,85 @@ def _reap_owned_worker(process: subprocess.Popen) -> None:
     process.wait()
 
 
+class _BoundedWorkerDiagnostics:
+    """Drain only the owned stderr pipe; retain at most MAX_FAILURE_BYTES.
+
+    No reader thread or diagnostic file survives worker cleanup. Each drain is
+    bounded; excess bytes are discarded and make the request fail closed.
+    """
+    def __init__(self, stream):
+        self.stream = stream
+        self.fd = stream.fileno()
+        self.data = bytearray()
+        self.overflow = False
+        self.eof = False
+        self.peek = None
+        if os.name == "nt":
+            import msvcrt
+            self.handle = msvcrt.get_osfhandle(self.fd)
+            self.peek = ctypes.WinDLL("kernel32", use_last_error=True, winmode=0x800).PeekNamedPipe
+            self.peek.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_uint32,
+                                  ctypes.c_void_p, ctypes.POINTER(ctypes.c_uint32), ctypes.c_void_p]
+            self.peek.restype = ctypes.c_int32
+        else:
+            os.set_blocking(self.fd, False)
+
+    def drain(self) -> None:
+        remaining = 64 * 1024
+        while not self.eof and remaining:
+            size = min(4096, remaining)
+            if self.peek is not None:
+                available = ctypes.c_uint32()
+                if not self.peek(self.handle, None, 0, None, ctypes.byref(available), None):
+                    if ctypes.get_last_error() in (109, 232):  # Broken/closed owned pipe.
+                        self.eof = True
+                        return
+                    raise NativeTextError("native parser diagnostic pipe is unavailable")
+                if not available.value:
+                    return
+                size = min(size, available.value)
+            try:
+                chunk = os.read(self.fd, size)
+            except BlockingIOError:
+                return
+            except OSError:
+                raise NativeTextError("native parser diagnostic pipe read failed") from None
+            if not chunk:
+                self.eof = True
+                return
+            remaining -= len(chunk)
+            room = MAX_FAILURE_BYTES - len(self.data)
+            self.data.extend(chunk[:room])
+            if len(chunk) > room:
+                self.overflow = True
+
+    def finish(self) -> None:
+        # Called only after owned termination/reaping. A retained foreign writer
+        # must not create an unbounded wait; fail closed and close our read end.
+        for _ in range(16):
+            self.drain()
+            if self.eof:
+                return
+        raise NativeTextError("native parser diagnostic pipe did not close after cleanup")
+
+
+def _safe_worker_failure(data: bytes) -> str:
+    """Failed-process context only; never trust native text or accept output."""
+    if not isinstance(data, bytes) or not 0 < len(data) <= MAX_FAILURE_BYTES:
+        return ""
+    try:
+        payload = json.loads(data)
+    except (ValueError, UnicodeError):
+        return ""
+    if (not isinstance(payload, dict) or set(payload) != {"failureStage", "failureType"}
+            or not isinstance(payload["failureStage"], str)
+            or not isinstance(payload["failureType"], str)
+            or payload["failureStage"] not in _WORKER_FAILURE_STAGES
+            or payload["failureType"] not in _WORKER_FAILURE_TYPES):
+        return ""
+    return f"; stage {payload['failureStage']}; type {payload['failureType']}"
+
+
 def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, object]]],
                                 *, parser_identity: dict[str, object] | None = None,
                                 python_executable: str = sys.executable,
@@ -548,21 +631,34 @@ def validate_native_pdf_bounded(data: bytes, authored: list[list[dict[str, objec
                     if key in os.environ:
                         environment[key] = os.environ[key]
             process = subprocess.Popen([str(executable), "-I", "-B", str(script), "--worker"],
-                                       stdin=incoming, stdout=outgoing, stderr=subprocess.DEVNULL,
+                                       stdin=incoming, stdout=outgoing, stderr=subprocess.PIPE,
                                        cwd=directory, env=environment,
                                        start_new_session=os.name == "posix")
             deadline = time.monotonic() + timeout
+            diagnostics = None
             try:
+                diagnostics = _BoundedWorkerDiagnostics(process.stderr)
                 while not _owned_worker_exited(process):
+                    diagnostics.drain()
                     if os.fstat(outgoing.fileno()).st_size > MAX_RESULT_BYTES:
                         raise NativeTextError("native parser output exceeds byte bounds")
+                    if diagnostics.overflow:
+                        raise NativeTextError("native parser failure context exceeds byte bounds")
                     if time.monotonic() >= deadline:
                         raise NativeTextError("native parser deadline expired")
                     time.sleep(min(.02, max(0, deadline - time.monotonic())))
             finally:
-                _reap_owned_worker(process)  # Kill/reap before output or stage cleanup.
+                try:
+                    _reap_owned_worker(process)  # Kill/reap before final drain or stage cleanup.
+                    if diagnostics is not None:
+                        diagnostics.finish()
+                finally:
+                    process.stderr.close()
+            if diagnostics.overflow:
+                raise NativeTextError("native parser failure context exceeds byte bounds")
             if process.returncode != 0:
-                raise NativeTextError(f"native parser rejected the request (exit status {process.returncode})")
+                detail = _safe_worker_failure(bytes(diagnostics.data))
+                raise NativeTextError(f"native parser rejected the request (exit status {process.returncode}{detail})")
             if not 0 < os.fstat(outgoing.fileno()).st_size <= MAX_RESULT_BYTES:
                 raise NativeTextError("native parser output is missing or exceeds bounds")
             outgoing.seek(0); raw = outgoing.read(MAX_RESULT_BYTES + 1)
@@ -621,6 +717,8 @@ def _deny_linux_worker_children() -> None:
 
 
 def _worker() -> None:
+    global _WORKER_FAILURE_STAGE
+    _WORKER_FAILURE_STAGE = "limits"
     _require_memory_contained_worker_platform()
     windows_job = None
     if os.name == "nt":
@@ -635,6 +733,7 @@ def _worker() -> None:
             if resource.getrlimit(resource.RLIMIT_AS) != (MAX_WORKER_MEMORY_BYTES, MAX_WORKER_MEMORY_BYTES):
                 raise NativeTextError("native worker memory-limit readback differs from requested bounds")
             _deny_linux_worker_children()
+    _WORKER_FAILURE_STAGE = "request"
     prefix = sys.stdin.buffer.read(4)
     if len(prefix) != 4:
         raise NativeTextError("native request header is missing")
@@ -655,13 +754,17 @@ def _worker() -> None:
         raise NativeTextError("authored page collection exceeds bounds")
     stage = Path.cwd() / "verified-parser"
     stage.mkdir()
+    _WORKER_FAILURE_STAGE = "parser-snapshot"
     parser_digest = _stage_parser(request["parser_identity"], stage)
     if os.name == "posix":
         resource.setrlimit(resource.RLIMIT_FSIZE, (MAX_RESULT_BYTES, MAX_RESULT_BYTES))
+    _WORKER_FAILURE_STAGE = "parser-extraction"
     pages = extract_native_pdf(data)
     if len(pages) != len(authored):
         raise NativeTextError("native PDF page count differs from authoring")
+    _WORKER_FAILURE_STAGE = "text-validation"
     measured = [validate_native_page(page, frames) for page, frames in zip(pages, authored)]
+    _WORKER_FAILURE_STAGE = "result"
     raw = json.dumps({"pdf_sha256": request["pdf_sha256"], "request_sha256": hashlib.sha256(header).hexdigest(),
                       "parser_identity_sha256": parser_digest,
                       "pages": measured}, allow_nan=False, separators=(",", ":")).encode("ascii")
@@ -675,6 +778,11 @@ if __name__ == "__main__":
         raise SystemExit("This internal worker is not an acceptance publisher.")
     try:
         _worker()
-    except Exception:
-        # No PDF content, paths or native diagnostic text is echoed to callers.
+    except Exception as exc:
+        # Fixed codes only: never exception messages, PDF content or paths.
+        kind = type(exc).__name__
+        if kind not in _WORKER_FAILURE_TYPES:
+            kind = "WorkerError"
+        sys.stderr.write(json.dumps({"failureStage": _WORKER_FAILURE_STAGE,
+                                     "failureType": kind}, separators=(",", ":")))
         raise SystemExit(1)
