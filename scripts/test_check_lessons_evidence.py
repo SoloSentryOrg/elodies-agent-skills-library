@@ -19,6 +19,13 @@ SPEC.loader.exec_module(guard)
 
 
 class ValidateBodyTests(unittest.TestCase):
+    def test_accepts_active_least_privilege_lesson(self) -> None:
+        guard.validate_body("## Lessons Learned\n\n- LL-0012: native least-privilege credentials.\n")
+
+    def test_rejects_unknown_lesson_without_a_bypass(self) -> None:
+        with self.assertRaises(guard.LessonsEvidenceError):
+            guard.validate_body("## Lessons Learned\n\n- LL-9999: unregistered control.\n")
+
     def test_rejects_empty_rationale(self) -> None:
         body = """## Lessons Learned
 

@@ -3,6 +3,7 @@
 /** Build an editable PowerPoint derivative from a validated assessment model. */
 
 import fs from "node:fs/promises";
+import { readStableRegularFile as readDescriptorFile } from "./stable_regular_file.mjs";
 import path from "node:path";
 import process from "node:process";
 import crypto from "node:crypto";
@@ -18,6 +19,8 @@ const SECURE_BUNDLE_HELPER = path.join(SCRIPT_DIR, "secure_pptx_stage_bundle.py"
 const PPTX_VALIDATOR = path.join(SCRIPT_DIR, "validate_assessment_pptx.py");
 
 const MAX_TEXT_BYTES = 64 * 1024;
+// Expectations belong to the authoring path, not the untrusted renderer manifest.
+const AUTHORED_TEXT = new WeakMap();
 const MAX_FINDINGS = 100;
 const MAX_REFERENCES = 250;
 const DECISIONS = new Set([
@@ -50,6 +53,8 @@ function usage() {
     "       --authoritative-build-manifest REPORT.build.json --word-qa-record QA.json",
     "       --workspace ARTIFACT_WORKSPACE --artifact-runtime-receipt RECEIPT.json",
     "       [--qa-dir QA_DIR --montage-helper HELPER.py --python /ABS/PYTHON] [--validate-only]",
+    "       Or replace normal output arguments with --v5-candidate-dir NEW_PRIVATE_DIR",
+    "       V5 candidates remain Pending native measurement; no normal output is published.",
     "",
     "Initialize ARTIFACT_WORKSPACE first with the Presentations skill's",
     "setup_artifact_tool_workspace.mjs helper.",
@@ -57,28 +62,31 @@ function usage() {
 }
 
 function parseArgs(argv) {
-  const result = { workspace: null, artifactRuntimeReceipt: null, qaDir: null, montageHelper: null, python: process.env.PYTHON || "python3", validateOnly: false };
+  const result = { workspace: null, artifactRuntimeReceipt: null, qaDir: null, montageHelper: null, python: process.env.PYTHON || "python3", validateOnly: false, v5CandidateDir: null };
   for (let index = 0; index < argv.length; index += 1) {
     const arg = argv[index];
     if (arg === "--validate-only") {
       result.validateOnly = true;
       continue;
     }
-    if (!["--workspace-root", "--stage-root", "--output", "--build-manifest", "--authoritative-docx", "--authoritative-build-manifest", "--word-qa-record", "--workspace", "--artifact-runtime-receipt", "--qa-dir", "--montage-helper", "--python"].includes(arg)) {
+    if (!["--workspace-root", "--stage-root", "--output", "--build-manifest", "--authoritative-docx", "--authoritative-build-manifest", "--word-qa-record", "--workspace", "--artifact-runtime-receipt", "--qa-dir", "--montage-helper", "--python", "--v5-candidate-dir"].includes(arg)) {
       throw new ModelError(`unexpected argument: ${arg}`);
     }
     const value = argv[index + 1];
     if (!value || value.startsWith("--")) {
       throw new ModelError(`missing value for ${arg}`);
     }
-    const key = { "--workspace-root": "workspaceRoot", "--stage-root": "stageRoot", "--output": "output", "--build-manifest": "buildManifest", "--authoritative-docx": "authoritativeDocx", "--authoritative-build-manifest": "authoritativeBuildManifest", "--word-qa-record": "wordQaRecord", "--workspace": "workspace", "--artifact-runtime-receipt": "artifactRuntimeReceipt", "--qa-dir": "qaDir", "--montage-helper": "montageHelper", "--python": "python" }[arg];
+    const key = { "--workspace-root": "workspaceRoot", "--stage-root": "stageRoot", "--output": "output", "--build-manifest": "buildManifest", "--authoritative-docx": "authoritativeDocx", "--authoritative-build-manifest": "authoritativeBuildManifest", "--word-qa-record": "wordQaRecord", "--workspace": "workspace", "--artifact-runtime-receipt": "artifactRuntimeReceipt", "--qa-dir": "qaDir", "--montage-helper": "montageHelper", "--python": "python", "--v5-candidate-dir": "v5CandidateDir" }[arg];
     result[key] = value;
     index += 1;
   }
+  if (result.v5CandidateDir && (result.validateOnly || result.output || result.buildManifest || result.qaDir)) {
+    throw new ModelError("v5 candidate mode cannot use normal output, build manifest, QA directory, or validation-only arguments");
+  }
   if (!result.workspaceRoot) throw new ModelError("--workspace-root is required");
   if (!result.stageRoot) throw new ModelError("--stage-root is required");
-  if (!result.validateOnly && !result.output) throw new ModelError("--output is required unless --validate-only is used");
-  if (!result.validateOnly && !result.buildManifest) throw new ModelError("--build-manifest is required unless --validate-only is used");
+  if (!result.validateOnly && !result.v5CandidateDir && !result.output) throw new ModelError("--output is required unless --validate-only is used");
+  if (!result.validateOnly && !result.v5CandidateDir && !result.buildManifest) throw new ModelError("--build-manifest is required unless --validate-only is used");
   if (!result.validateOnly && (!result.authoritativeDocx || !result.authoritativeBuildManifest || !result.wordQaRecord)) {
     throw new ModelError("--authoritative-docx, --authoritative-build-manifest, and --word-qa-record are required for a build");
   }
@@ -89,6 +97,7 @@ function parseArgs(argv) {
   if (authoritativeCount > 0 && authoritativeCount < 3) {
     throw new ModelError("authoritative Word inputs must be supplied together");
   }
+  if (result.v5CandidateDir && !result.montageHelper) throw new ModelError("candidate mode requires the receipt-bound montage helper and Python runtime");
   if (!result.validateOnly && result.qaDir && !result.montageHelper) throw new ModelError("--montage-helper is required with --qa-dir");
   return result;
 }
@@ -651,7 +660,13 @@ function notesFor(model, ids) {
   return lines.join("\n");
 }
 
-function addText(slide, name, value, position, fontSize, options = {}) {
+function addText(slide, name, value, position, fontSizePt, options = {}) {
+  const expectations = AUTHORED_TEXT.get(slide) || [];
+  if (expectations.length >= 4096) throw new ModelError("authored text count exceeds layout bounds");
+  if (expectations.some((item) => item.name === name)) throw new ModelError("duplicate authored text name");
+  expectations.push(Object.freeze({ name, text: value, singleLine: name.startsWith("slide-title-"),
+    bbox: Object.freeze([position.left, position.top, position.width, position.height]) }));
+  AUTHORED_TEXT.set(slide, expectations);
   const shape = slide.shapes.add({
     geometry: "textbox",
     name,
@@ -661,7 +676,10 @@ function addText(slide, name, value, position, fontSize, options = {}) {
   });
   shape.text = value;
   shape.text.style = {
-    fontSize,
+    // Authoring values are points; artifact-tool's numeric fontSize is pixels.
+    // Keep this conversion separate from the rendered-size acceptance gate:
+    // shrinkText may still reduce the resulting size below the minimum.
+    fontSize: fontSizePt * (96 / 72),
     typeface: "Helvetica Neue",
     color: options.color || "#000000",
     bold: options.bold || false,
@@ -692,7 +710,8 @@ function setNotes(slide, model, sourceIds) {
 function addCover(presentation, model) {
   const slide = presentation.slides.add();
   slide.background.fill = "#FFFFFF";
-  addText(slide, "cover-kicker", "MICROSOFT IDE AI EXTENSION SECURITY ASSESSMENT", { left: 41, top: 42, width: 760, height: 52 }, 24, { color: "#3D8DFF", bold: true });
+  // Reserve room for both native-rendered lines without shrinking the heading.
+  addText(slide, "cover-kicker", "MICROSOFT IDE AI EXTENSION SECURITY ASSESSMENT", { left: 41, top: 42, width: 760, height: 100 }, 24, { color: "#3D8DFF", bold: true });
   addText(slide, "cover-title", model.assessment, { left: 41, top: 174, width: 1050, height: 260 }, 72, { bold: true, verticalAlignment: "bottom" });
   addText(slide, "cover-subtitle", `${model.publisher} · ${model.extension_id} · ${model.version} · ${model.ide_scope.join(" / ")}`, { left: 41, top: 490, width: 940, height: 105 }, 24, { color: "#303842" });
   addText(slide, "cover-control", `${model.assessment_date} · Document ${model.document_version} · PUBLIC`, { left: 41, top: 620, width: 800, height: 34 }, 18, { color: "#58616B" });
@@ -994,26 +1013,132 @@ async function writeBlob(filename, blob) {
   await fs.writeFile(filename, new Uint8Array(await blob.arrayBuffer()), { flag: "wx", mode: 0o600 });
 }
 
-function validateLayout(layoutText, stem) {
+function validateV5Structure(layoutText, stem, authoredText) {
+  // Structure and authoring identity only. This cannot establish native font
+  // size or wrapping, and must never be substituted for final acceptance.
+  if (typeof layoutText !== "string" || Buffer.byteLength(layoutText, "utf8") > 8 * 1024 * 1024) {
+    throw new ModelError(`${stem} produced an oversized or invalid layout manifest`);
+  }
   const layout = JSON.parse(layoutText);
-  if (layout?.schema !== "openai.presentation.layout/v4" || !Array.isArray(layout.elements)) {
+  const canvas = layout?.slide?.position;
+  if (layout?.schema !== "openai.presentation.layout/v5" || layout.unit !== "px"
+    || !canvas || canvas.left !== 0 || canvas.top !== 0 || canvas.width !== 1280 || canvas.height !== 720
+    || !Array.isArray(layout.elements) || !layout.elements.length
+    || !Array.isArray(layout.inheritedLayers) || layout.inheritedLayers.length > 8
+    || layout.inheritedLayers.some((layer) => !layer || !["layout", "master"].includes(layer.scope))) {
+    throw new ModelError(`${stem} produced an unsupported structural layout manifest`);
+  }
+  if (!Array.isArray(authoredText) || !authoredText.length || authoredText.length > 4096) {
+    throw new ModelError(`${stem} lacks bounded authored text expectations`);
+  }
+  const expected = new Map();
+  let authoredBytes = 0;
+  for (const item of authoredText) {
+    if (!item || typeof item.name !== "string" || !item.name || item.name.length > 256
+      || typeof item.text !== "string" || !item.text.trim() || Buffer.byteLength(item.text, "utf8") > 65536
+      || typeof item.singleLine !== "boolean" || !Array.isArray(item.bbox) || item.bbox.length !== 4
+      || !item.bbox.every(Number.isFinite) || expected.has(item.name)) {
+      throw new ModelError(`${stem} has invalid authored text expectations`);
+    }
+    authoredBytes += Buffer.byteLength(item.text, "utf8");
+    if (authoredBytes > 8 * 1024 * 1024) throw new ModelError(`${stem} authored text exceeds aggregate bounds`);
+    const [left, top, width, height] = item.bbox;
+    if (left < 0 || top < 0 || width <= 0 || height <= 0 || left + width > 1280 || top + height > 720) {
+      throw new ModelError(`${stem} authored frame exceeds canvas bounds`);
+    }
+    expected.set(item.name, item);
+  }
+  const layers = [{ scope: "slide", elements: layout.elements }, ...layout.inheritedLayers];
+  const observed = new Set();
+  let count = 0;
+  for (const layer of layers) {
+    if (!layer || !["slide", "layout", "master"].includes(layer.scope) || !Array.isArray(layer.elements)) {
+      throw new ModelError(`${stem} has unsupported inherited layout evidence`);
+    }
+    count += layer.elements.length;
+    if (count > 4096) throw new ModelError(`${stem} structural element collection exceeds bounds`);
+    for (const element of layer.elements) {
+      const position = element?.position;
+      if (!element || typeof element !== "object" || Array.isArray(element) || !position
+        || element.scope !== layer.scope || typeof element.kind !== "string" || !element.kind
+        || Object.hasOwn(element, "elements") || Object.hasOwn(element, "children")) {
+        throw new ModelError(`${stem} has incomplete or nested structural evidence`);
+      }
+      const bbox = [position.left, position.top, position.width, position.height];
+      const [left, top, width, height] = bbox;
+      if (!bbox.every(Number.isFinite) || width < 0 || height < 0 || left < -0.5 || top < -0.5
+        || left + width > 1280.5 || top + height > 720.5) {
+        throw new ModelError(`${stem} structural element exceeds canvas bounds`);
+      }
+      const authored = expected.get(element.name);
+      if (authored) {
+        if (layer.scope !== "slide" || element.kind !== "textbox" || element.editable !== true
+          || observed.has(element.name) || element.text !== authored.text
+          || bbox.some((value, index) => Math.abs(value - authored.bbox[index]) > 0.000001)) {
+          throw new ModelError(`${stem} structural text differs from immutable authoring`);
+        }
+        observed.add(element.name);
+      } else if (element.kind === "textbox" || (Object.hasOwn(element, "text")
+        && (typeof element.text !== "string" || element.text.trim()))) {
+        throw new ModelError(`${stem} contains unbound structural text`);
+      }
+    }
+  }
+  if (observed.size !== expected.size) throw new ModelError(`${stem} is missing authored text evidence`);
+  return Object.freeze({ schema: layout.schema, nativeMeasurementsRequired: true });
+}
+
+function validateLayout(layoutText, stem, authoredText) {
+  if (!Array.isArray(authoredText) || authoredText.length > 4096) {
+    throw new ModelError(`${stem} lacks bounded authored text expectations`);
+  }
+  const expected = new Map();
+  for (const item of authoredText) {
+    if (!item || typeof item.name !== "string" || !item.name
+      || typeof item.text !== "string" || !item.text.trim()
+      || typeof item.singleLine !== "boolean" || expected.has(item.name)) {
+      throw new ModelError(`${stem} has invalid authored text expectations`);
+    }
+    expected.set(item.name, item);
+  }
+  const observed = new Set();
+  if (typeof layoutText !== "string" || Buffer.byteLength(layoutText, "utf8") > 8 * 1024 * 1024) {
+    throw new ModelError(`${stem} produced an oversized or invalid layout manifest`);
+  }
+  const layout = JSON.parse(layoutText);
+  if (layout?.schema !== "openai.presentation.layout/v4" || !Array.isArray(layout.elements)
+    || layout.elements.length === 0 || layout.elements.length > 4096) {
     throw new ModelError(`${stem} produced an unsupported layout manifest`);
   }
-  for (const element of layout.elements) {
-    if (!Array.isArray(element.bbox) || element.bbox.length !== 4) continue;
+  for (const [index, element] of layout.elements.entries()) {
+    if (!element || typeof element !== "object" || Array.isArray(element)
+      || !Array.isArray(element.bbox) || element.bbox.length !== 4) {
+      throw new ModelError(`${stem} element ${index} has incomplete layout bounds`);
+    }
     const [left, top, width, height] = element.bbox;
     if (![left, top, width, height].every(Number.isFinite) || width < 0 || height < 0 || left < -0.5 || top < -0.5 || left + width > 1280.5 || top + height > 720.5) {
       throw new ModelError(`${stem} element ${element.name || element.id} overflows the slide canvas`);
     }
-    if (typeof element.text === "string" && element.text.trim() && !String(element.name || "").startsWith("footer-")) {
-      if (!Number.isFinite(element.resolvedFontSize) || element.resolvedFontSize < 16) {
-        throw new ModelError(`${stem} element ${element.name || element.id} renders below 16pt`);
+    const authored = expected.get(element.name);
+    if (authored) {
+      if (observed.has(element.name) || element.text !== authored.text) {
+        throw new ModelError(`${stem} has missing, altered or duplicate authored text evidence`);
       }
-    }
-    if (String(element.name || "").startsWith("slide-title-") && element.textLayout?.lineCount !== 1) {
-      throw new ModelError(`${stem} title wraps unexpectedly`);
+      observed.add(element.name);
+      if (width <= 0 || height <= 0 || !Number.isFinite(element.resolvedFontSize)
+        || element.resolvedFontSize < 16) {
+        throw new ModelError(`${stem} authored text renders below 16pt or lacks usable bounds`);
+      }
+      const lines = element.textLayout?.lineCount;
+      if (!Number.isSafeInteger(lines) || lines < 1) {
+        throw new ModelError(`${stem} authored text lacks line-layout evidence`);
+      }
+      if (authored.singleLine && lines !== 1) throw new ModelError(`${stem} title wraps unexpectedly`);
+    } else if (typeof element.text === "string" && element.text.trim()) {
+      throw new ModelError(`${stem} contains unbound rendered text`);
     }
   }
+  if (observed.size !== expected.size) throw new ModelError(`${stem} is missing authored text evidence`);
 }
 
 async function createMontage(helperValue, pythonValue, qaPath, slideCount) {
@@ -1046,7 +1171,7 @@ async function createMontage(helperValue, pythonValue, qaPath, slideCount) {
   await fs.writeFile(path.join(qaPath, "deck-montage.json"), `${JSON.stringify({ slide_count: slideCount, columns: 5, rows: expectedRows, width, height }, null, 2)}\n`, { flag: "wx" });
 }
 
-async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt, workspaceRoot, montageHelper, python) {
+async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt, workspaceRoot, montageHelper, python, v5Candidate = false) {
   const artifactTool = await loadArtifactTool(workspace, artifactRuntimeReceipt, workspaceRoot, montageHelper, python);
   const { Presentation, PresentationFile } = artifactTool.module;
   const presentation = Presentation.create({ slideSize: { width: 1280, height: 720 } });
@@ -1066,18 +1191,24 @@ async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt
     if (!qaInfo.isDirectory() || qaInfo.isSymbolicLink()) throw new ModelError("--qa-dir must be a real directory");
     if ((await fs.readdir(qaPath)).length !== 0) throw new ModelError("--qa-dir must be empty");
   }
+  if (v5Candidate && presentation.slides.items.length > 100) throw new ModelError("candidate slides exceed native measurement bounds");
+  const candidateSlides = [];
   for (const [index, slide] of presentation.slides.items.entries()) {
     const stem = `slide-${String(index + 1).padStart(2, "0")}`;
     const rendered = await presentation.export({ slide, format: "png", scale: 1 });
-    const layout = await slide.export({ format: "layout" });
+    const layout = await slide.export(v5Candidate ? { format: "layout", detail: "full" } : { format: "layout" });
     const layoutText = await layout.text();
-    validateLayout(layoutText, stem);
+    if (v5Candidate) {
+      validateV5Structure(layoutText, stem, AUTHORED_TEXT.get(slide));
+      candidateSlides.push({ slide: index + 1, layout: `${stem}.layout.json`,
+        authored: JSON.parse(JSON.stringify(AUTHORED_TEXT.get(slide))) });
+    } else validateLayout(layoutText, stem, AUTHORED_TEXT.get(slide));
     if (qaPath) {
       await writeBlob(path.join(qaPath, `${stem}.png`), rendered);
       await fs.writeFile(path.join(qaPath, `${stem}.layout.json`), layoutText, { flag: "wx" });
     }
   }
-  if (qaPath) {
+  if (qaPath && !v5Candidate) {
     await createMontage(montageHelper, artifactTool.pythonLauncher, qaPath, presentation.slides.items.length);
   }
   const pptx = await PresentationFile.exportPptx(presentation);
@@ -1138,29 +1269,14 @@ async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt
       if (error.code !== "ENOENT") throw error;
     });
   }
-  return { slideCount: presentation.slides.items.length, qaPath, artifactToolVersion: artifactTool.version, artifactRuntimeReceiptSha256: artifactTool.receiptSha256, outputSha256: temporarySha256 };
+  return { slideCount: presentation.slides.items.length, qaPath, artifactToolVersion: artifactTool.version, artifactRuntimeReceiptSha256: artifactTool.receiptSha256, outputSha256: temporarySha256, candidateSlides };
 }
 
 async function readStableRegularFile(filename, field) {
-  let handle;
   try {
-    const pathInfo = await fs.lstat(filename);
-    if (!pathInfo.isFile() || pathInfo.isSymbolicLink()) throw new ModelError(`${field} must be a regular non-symlink file`);
-    handle = await fs.open(filename, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
-    const before = await handle.stat();
-    if (!before.isFile()) throw new ModelError(`${field} must be a regular non-symlink file`);
-    const data = await handle.readFile();
-    const after = await handle.stat();
-    if (pathInfo.dev !== before.dev || pathInfo.ino !== before.ino || data.length !== before.size || before.dev !== after.dev || before.ino !== after.ino
-      || before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
-      throw new ModelError(`${field} changed while being read`);
-    }
-    return { data, stat: after };
-  } catch (error) {
-    if (error instanceof ModelError) throw error;
-    throw new ModelError(`${field} must be a stable regular non-symlink file`);
-  } finally {
-    if (handle) await handle.close();
+    return await readDescriptorFile(filename, field);
+  } catch {
+    throw new ModelError(`${field} must be a stable bounded regular non-symlink file`);
   }
 }
 
@@ -1179,7 +1295,7 @@ async function qaBindings(qaPath) {
     if (name.includes("/") || name.includes("\\") || name === "." || name === "..") throw new ModelError("QA output contains an unsafe filename");
     const filename = path.join(qaPath, name);
     const { data, stat } = await readStableRegularFile(filename, `QA file ${name}`);
-    const pathInfo = await fs.lstat(filename);
+    const pathInfo = await fs.lstat(filename, { bigint: true });
     if (pathInfo.dev !== stat.dev || pathInfo.ino !== stat.ino) throw new ModelError(`QA file ${name} changed identity while being bound`);
     bindings.push({ file: name, sha256: sha256(data) });
   }
@@ -1219,6 +1335,76 @@ async function writeBuildManifest(filename, model, bindings, output, build) {
   await fs.writeFile(filename, `${JSON.stringify(payload, null, 2)}\n`, { encoding: "utf8", flag: "wx" });
 }
 
+async function verifyCandidateFiles(directory, files) {
+  if (!Array.isArray(files) || !files.length || files.length > 256) throw new ModelError("candidate file bindings exceed bounds");
+  const seen = new Set();
+  for (const item of files) {
+    if (!item || typeof item.file !== "string" || !/^[A-Za-z0-9_.-]+$/.test(item.file)
+      || item.file === "." || item.file === ".." || seen.has(item.file)
+      || !/^[0-9a-f]{64}$/.test(item.sha256) || !Number.isSafeInteger(item.size)
+      || item.size < 1 || item.size > 64 * 1024 * 1024) throw new ModelError("candidate file binding is invalid");
+    seen.add(item.file);
+    const { data } = await readStableRegularFile(path.join(directory, item.file), "private candidate evidence");
+    if (data.length !== item.size || sha256(data) !== item.sha256) throw new ModelError("candidate evidence differs from its immutable binding");
+  }
+}
+
+async function buildPrivateV5Candidate(args, workspaceRoot, model, bindings) {
+  // POSIX mode readback is explicit. Native Windows private-directory ACL
+  // assurance is not established by chmod and must not be silently assumed.
+  if (process.platform === "win32") throw new ModelError("private v5 candidate staging requires approved POSIX directory permissions");
+  const requested = path.resolve(args.v5CandidateDir);
+  const parent = await fs.realpath(path.dirname(requested));
+  if (parent !== workspaceRoot) workspaceRelative(workspaceRoot, parent, "candidate parent");
+  const parentInfo = await fs.lstat(parent);
+  if (!parentInfo.isDirectory() || parentInfo.isSymbolicLink()) throw new ModelError("candidate parent must be a real workspace directory");
+  const directory = path.join(parent, path.basename(requested));
+  workspaceRelative(workspaceRoot, directory, "private candidate directory");
+  await fs.mkdir(directory, { mode: 0o700 }); // Refuse every existing path; no overwrite/reuse.
+  const info = await fs.lstat(directory);
+  if (!info.isDirectory() || info.isSymbolicLink() || (info.mode & 0o777) !== 0o700) throw new ModelError("candidate directory is not private");
+  const sources = {};
+  for (const name of ["build_assessment_pptx.mjs", "stable_regular_file.mjs", "secure_pptx_stage_bundle.py",
+    "validate_assessment_pptx.py", "create_artifact_runtime_receipt.mjs", "native_pptx_text.py",
+    "render_presentations_with_powerpoint.applescript", "render_presentations_with_powerpoint.ps1", "stage_office_artifact.py",
+    "test_native_pptx_text.py", "test_powerpoint_path_identity.py", "create_pptx_montage.py",
+    "portable_fs.py", "requirements.lock", "test_build_assessment_pptx.py"]) {
+    sources[`scripts/${name}`] = await hashRegularFile(path.join(SCRIPT_DIR, name), "candidate source");
+  }
+  const output = path.join(directory, "candidate.pptx");
+  const build = await buildDeck(model, output, directory, args.workspace, args.artifactRuntimeReceipt,
+    workspaceRoot, args.montageHelper, args.python, true);
+  const authoring = { schema: "solosentry.pptx.authoring/v1", unit: "px", canvas: [1280, 720],
+    slides: build.candidateSlides };
+  const authoringBytes = Buffer.from(`${JSON.stringify(authoring)}\n`, "utf8");
+  if (authoringBytes.length > 8 * 1024 * 1024) throw new ModelError("candidate authoring exceeds aggregate bounds");
+  await fs.writeFile(path.join(directory, "authoring.json"), authoringBytes, { flag: "wx", mode: 0o400 });
+  const { data: receipt } = await readStableRegularFile(args.artifactRuntimeReceipt, "candidate artifact runtime receipt");
+  if (sha256(receipt) !== build.artifactRuntimeReceiptSha256) throw new ModelError("candidate runtime receipt changed during construction");
+  await fs.writeFile(path.join(directory, "artifact-runtime-receipt.json"), receipt, { flag: "wx", mode: 0o400 });
+  const files = [];
+  for (const name of (await fs.readdir(directory)).sort()) {
+    const filename = path.join(directory, name);
+    const { data } = await readStableRegularFile(filename, "private candidate evidence");
+    await fs.chmod(filename, 0o400);
+    files.push({ file: name, size: data.length, sha256: sha256(data) });
+  }
+  await verifyCandidateFiles(directory, files);
+  for (const [relative, digest] of Object.entries(sources)) {
+    if (await hashRegularFile(path.join(SCRIPT_DIR, path.basename(relative)), "candidate source") !== digest) {
+      throw new ModelError("candidate source changed during construction");
+    }
+  }
+  const payload = { schema: "solosentry.pptx.v5-candidate/v1", status: "Pending native measurement",
+    nativeMeasurementsRequired: true, native_powerpoint_closeout: "Pending", human_acceptance: "Pending",
+    slide_count: build.slideCount, layout_schema: "openai.presentation.layout/v5", inputs: bindings,
+    runtime: { node: process.version, artifact_tool: build.artifactToolVersion,
+      artifact_runtime_receipt_sha256: build.artifactRuntimeReceiptSha256 },
+    candidate_pptx_sha256: build.outputSha256, source_bindings: sources, files };
+  await fs.writeFile(path.join(directory, "candidate.json"), `${JSON.stringify(payload, null, 2)}\n`, { flag: "wx", mode: 0o400 });
+  return { status: payload.status, candidate_directory: directory, candidate_manifest: path.join(directory, "candidate.json"), slide_count: build.slideCount };
+}
+
 async function main() {
   const args = parseArgs(process.argv.slice(2));
   const workspaceRoot = await resolveWorkspaceRoot(args.workspaceRoot);
@@ -1234,6 +1420,11 @@ async function main() {
   }
   if (args.validateOnly) {
     process.stdout.write(`${JSON.stringify({ status: "validated", stage_root: stageRoot, input, target: model.target, findings: model.findings.length, references: model.references.length, authoritative_word: Boolean(bindings.authoritative_word) })}\n`);
+    return;
+  }
+  if (args.v5CandidateDir) {
+    const candidate = await buildPrivateV5Candidate(args, workspaceRoot, model, bindings);
+    process.stdout.write(`${JSON.stringify(candidate)}\n`);
     return;
   }
   const output = await safeOutput(workspaceRoot, args.output, ".pptx");

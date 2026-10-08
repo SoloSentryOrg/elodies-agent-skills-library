@@ -36,6 +36,8 @@ def _presentation_skill_dir() -> Path:
 
 SKILL_DIR = _presentation_skill_dir()
 SETUP = SKILL_DIR / "container_tools" / "setup_artifact_tool_workspace.mjs"
+ARTIFACT_NODE_MODULES = Path(os.environ["CODEX_ARTIFACT_NODE_MODULES"]).expanduser().resolve() if os.environ.get("CODEX_ARTIFACT_NODE_MODULES") else None
+BUNDLED_ARTIFACT_AVAILABLE = ARTIFACT_NODE_MODULES is not None and (ARTIFACT_NODE_MODULES / "@oai" / "artifact-tool" / "package.json").is_file()
 def valid_model() -> dict[str, object]:
     references = [
         {
@@ -121,6 +123,225 @@ def valid_model() -> dict[str, object]:
 
 
 class AssessmentPptxTests(unittest.TestCase):
+    def test_v5_structure_preserves_authoring_and_requires_native_measurements(self) -> None:
+        probe = r'''
+          const fs = require("node:fs");
+          const vm = require("node:vm");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const start = source.indexOf("function validateV5Structure(");
+          const end = source.indexOf("\nfunction validateLayout(", start);
+          assert.ok(start >= 0 && end > start);
+          const check = vm.runInNewContext(`(${source.slice(start, end)})`, { ModelError: Error, Buffer }, { timeout: 1000 });
+          const expected = [{ name: "title", text: "Readable title", singleLine: true, bbox: [40, 40, 1200, 60] }];
+          const title = { name: "title", text: "Readable title", kind: "textbox", scope: "slide", editable: true,
+            position: { left: 40, top: 40, width: 1200, height: 60 }, style: { fontSize: 1 } };
+          const manifest = () => ({ schema: "openai.presentation.layout/v5", unit: "px",
+            slide: { position: { left: 0, top: 0, width: 1280, height: 720 } }, inheritedLayers: [], elements: [title] });
+          const invoke = (value, authoring = expected) => check(JSON.stringify(value), "test-slide", authoring);
+          const result = invoke(manifest());
+          assert.equal(result.nativeMeasurementsRequired, true);
+          assert.ok(Object.isFrozen(result));
+          // A nominal renderer font or missing line count cannot establish acceptance.
+          assert.equal(result.schema, "openai.presentation.layout/v5");
+          for (const change of [
+            { text: "Changed" }, { name: "renamed" }, { editable: false }, { kind: "shape" },
+            { position: { ...title.position, left: 41 } }, { children: [] },
+            { position: { left: 0, top: 0, width: 1281, height: 60 } },
+          ]) {
+            const value = manifest(); value.elements = [{ ...title, ...change }];
+            assert.throws(() => invoke(value));
+          }
+          const duplicate = manifest(); duplicate.elements.push({ ...title });
+          assert.throws(() => invoke(duplicate), /differs/);
+          const extra = manifest(); extra.elements.push({ ...title, name: "unreviewed", text: "Extra" });
+          assert.throws(() => invoke(extra), /unbound/);
+          const inherited = manifest(); inherited.inheritedLayers = [{ scope: "master", elements: [{ ...title, scope: "master", name: "hidden" }] }];
+          assert.throws(() => invoke(inherited), /unbound/);
+          const missing = manifest(); missing.elements = [{ kind: "shape", scope: "slide", position: title.position }];
+          assert.throws(() => invoke(missing), /missing authored/);
+          for (const value of [{ ...manifest(), unit: "pt" }, { ...manifest(), schema: "openai.presentation.layout/v4" },
+            { ...manifest(), slide: { position: { left: 0, top: 0, width: 960, height: 540 } } },
+            { ...manifest(), inheritedLayers: null },
+            { ...manifest(), inheritedLayers: [{ scope: "slide", elements: [] }] }]) assert.throws(() => invoke(value), /unsupported/);
+          const bounds = manifest(); bounds.elements = Array(4097).fill(title);
+          assert.throws(() => invoke(bounds), /exceeds bounds/);
+          assert.throws(() => check(" ".repeat(8 * 1024 * 1024 + 1), "oversized", expected), /oversized/);
+          assert.throws(() => invoke(manifest(), [{ ...expected[0], bbox: null }]), /invalid authored/);
+        '''
+        result = subprocess.run(["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_private_candidate_hash_and_mode_boundaries(self) -> None:
+        evidence = self.root / "bound.layout.json"
+        evidence.write_text('{"schema":"openai.presentation.layout/v5"}', encoding="utf-8")
+        probe = r'''
+          const fs = require("node:fs");
+          const fsp = require("node:fs/promises");
+          const vm = require("node:vm");
+          const path = require("node:path");
+          const crypto = require("node:crypto");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const begin = source.indexOf("async function verifyCandidateFiles(");
+          const end = source.indexOf("\nasync function buildPrivateV5Candidate(", begin);
+          const sha256 = data => crypto.createHash("sha256").update(data).digest("hex");
+          const check = vm.runInNewContext(`(${source.slice(begin, end)})`, {
+            ModelError: Error, path, sha256,
+            readStableRegularFile: async file => ({data: await fsp.readFile(file)}),
+          }, {timeout: 1000});
+          const argStart = source.indexOf("function parseArgs(");
+          const argEnd = source.indexOf("\nfunction text(", argStart);
+          const parse = vm.runInNewContext(`(${source.slice(argStart, argEnd)})`, {
+            ModelError: Error, process: {env: {}},
+          }, {timeout: 1000});
+          const directory = process.argv[2];
+          const file = path.join(directory, "bound.layout.json");
+          const data = fs.readFileSync(file);
+          const binding = {file: "bound.layout.json", size: data.length, sha256: sha256(data)};
+          (async () => {
+            await check(directory, [binding]);
+            await assert.rejects(check(directory, [{...binding, sha256: "0".repeat(64)}]), /immutable binding/);
+            await assert.rejects(check(directory, [{...binding, file: "../escape.json"}]), /invalid/);
+            await assert.rejects(check(directory, [binding, binding]), /invalid/);
+            await fsp.writeFile(file, Buffer.concat([data, Buffer.from("changed")]));
+            await assert.rejects(check(directory, [binding]), /immutable binding/);
+            for (const incompatible of [["--output", "normal.pptx"], ["--build-manifest", "normal.json"],
+                ["--qa-dir", "normal-qa"], ["--validate-only"]]) {
+              assert.throws(() => parse(["--v5-candidate-dir", "private", ...incompatible]), /cannot use normal/);
+            }
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+        '''
+        result = subprocess.run(["node", "-e", probe, str(SCRIPT), str(self.root)], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_layout_gate_rejects_incomplete_rendering_evidence(self) -> None:
+        """Exercise the actual guard with malformed evidence, not authored models."""
+        probe = r'''
+          const fs = require("node:fs");
+          const vm = require("node:vm");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const start = source.indexOf("function validateLayout(");
+          const end = source.indexOf("\nasync function createMontage(", start);
+          assert.ok(start >= 0 && end > start);
+          const validate = vm.runInNewContext(`(${source.slice(start, end)})`, {
+            ModelError: Error, Buffer,
+          }, { timeout: 1000 });
+          const title = { name: "slide-title-1", bbox: [40, 40, 1200, 60],
+            text: "Readable title", resolvedFontSize: 32, textLayout: { lineCount: 1 } };
+          const expectations = [{ name: title.name, text: title.text, singleLine: true }];
+          const validateGuard = validate;
+          // Geometry-only controls explicitly author no text; every text control
+          // is bound to the trusted title, irrespective of renderer omissions.
+          const check = (value, stem, expected = expectations) => validateGuard(value, stem, expected);
+          const manifest = (elements) => JSON.stringify({
+            schema: "openai.presentation.layout/v4", elements,
+          });
+          check(manifest([title]), "valid");
+          // A line's zero-height geometry remains permitted.
+          check(manifest([{ bbox: [40, 140, 800, 0] }]), "line", []);
+          for (const bbox of [undefined, [], [0, 0, 100], "0,0,100,100"]) {
+            const unsafe = { ...title, bbox, resolvedFontSize: 1,
+              textLayout: { lineCount: 3 } };
+            assert.throws(() => check(manifest([unsafe]), "incomplete"),
+              /incomplete layout bounds/);
+          }
+          for (const element of [null, false, 42, [], "text"]) {
+            assert.throws(() => check(manifest([element]), "invalid"),
+              /incomplete layout bounds/);
+          }
+          assert.throws(() => check(manifest([]), "empty"), /unsupported/);
+          check(manifest(Array(4096).fill({ bbox: [40, 140, 800, 0] })), "count-boundary", []);
+          assert.throws(() => check(manifest(Array(4097).fill(title)), "count"), /unsupported/);
+          assert.throws(() => check(" ".repeat(8 * 1024 * 1024 + 1), "size"), /oversized/);
+          assert.throws(() => check(null, "non-string"), /invalid layout manifest/);
+          assert.throws(() => check("{", "invalid-json"));
+          for (const bbox of [[null, 0, 100, 100], ["0", 0, 100, 100],
+            [0, 0, -1, 100], [0, 0, 100, -1]]) {
+            assert.throws(() => check(manifest([{ ...title, bbox }]), "coordinates"), /overflows/);
+          }
+          assert.throws(() => check(manifest([{ ...title, bbox: [0, 0, 1281, 100] }]),
+            "overflow"), /overflows/);
+          assert.throws(() => check(manifest([{ ...title, resolvedFontSize: 15 }]),
+            "tiny"), /below 16pt/);
+          assert.throws(() => check(manifest([{ ...title, textLayout: { lineCount: 2 } }]),
+            "wrapped"), /wraps/);
+          assert.throws(() => check(JSON.stringify({
+            schema: "openai.presentation.layout/v5", elements: [title],
+          }), "unsupported-runtime"), /unsupported/);
+          assert.throws(() => validateGuard(manifest([title]), "missing-authoring"), /authored text expectations/);
+          for (const text of [undefined, null, "", "Other text", 42]) {
+            assert.throws(() => check(manifest([{ ...title, text }]), "omitted-text"), /authored text evidence/);
+          }
+          assert.throws(() => check(manifest([{ ...title, name: "footer-forged" }]), "renamed"), /unbound/);
+          assert.throws(() => check(manifest([{ bbox: [40, 140, 800, 0] }]), "missing-text"), /missing authored/);
+          assert.throws(() => check(manifest([title, title]), "duplicate"), /duplicate authored/);
+          for (const textLayout of [undefined, {}, { lineCount: 0 }, { lineCount: 1.5 }, { lineCount: "1" }]) {
+            assert.throws(() => check(manifest([{ ...title, textLayout }]), "lines"), /line-layout/);
+          }
+          const footer = { ...title, name: "footer-number-1", resolvedFontSize: 15 };
+          assert.throws(() => check(manifest([footer]), "tiny-footer", [
+            { name: footer.name, text: footer.text, singleLine: false },
+          ]), /below 16pt/);
+          for (const expected of [null, {}, [{ ...expectations[0], text: "" }],
+            [expectations[0], expectations[0]], [{ ...expectations[0], singleLine: "false" }]]) {
+            assert.throws(() => check(manifest([title]), "invalid-authoring", expected), /authored text expectations/);
+          }
+        '''
+        result = subprocess.run(
+            ["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
+    def test_authored_text_is_independent_of_renderer_metadata(self) -> None:
+        probe = r'''
+          const fs = require("node:fs");
+          const vm = require("node:vm");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const start = source.indexOf("function addText(");
+          const end = source.indexOf("\nfunction addFooter(", start);
+          const authored = new WeakMap();
+          const add = vm.runInNewContext(`(${source.slice(start, end)})`, {
+            ModelError: Error, AUTHORED_TEXT: authored,
+          }, { timeout: 1000 });
+          const shapes = [];
+          const slide = { shapes: { add(config) {
+            const shape = { config };
+            Object.defineProperty(shape, "text", {
+              get() { return this.frame; }, set(value) { this.frame = { value }; },
+            });
+            shapes.push(shape); return shape;
+          } } };
+          add(slide, "slide-title-2", "Exact title", { left: 40, top: 40, width: 1200, height: 60 }, 40);
+          add(slide, "body-2", "Two lines\nExact body", { left: 40, top: 140, width: 1200, height: 100 }, 18);
+          add(slide, "footer-number-2", "2", { left: 1100, top: 660, width: 100, height: 28 }, 16);
+          const expected = authored.get(slide);
+          assert.equal(expected.length, 3);
+          assert.equal(expected[0].singleLine, true);
+          assert.equal(expected[1].singleLine, false);
+          assert.equal(expected[2].singleLine, false);
+          assert.equal(expected[1].text, "Two lines\nExact body");
+          assert.ok(expected.every(Object.isFrozen));
+          assert.ok(expected.every((item) => Object.isFrozen(item.bbox)));
+          assert.equal(JSON.stringify(expected[0].bbox), JSON.stringify([40, 40, 1200, 60]));
+          shapes[0].config.position.left = 0;
+          assert.equal(expected[0].bbox[0], 40);
+          shapes[0].frame.value = "Renderer altered title";
+          shapes[0].config.name = "footer-forged";
+          assert.equal(expected[0].text, "Exact title");
+          assert.equal(expected[0].name, "slide-title-2");
+          assert.equal(shapes[2].frame.style.fontSize, 16 * 96 / 72);
+          assert.throws(() => add(slide, "slide-title-2", "Duplicate", {}, 40), /duplicate/);
+          assert.equal(authored.get(slide).length, 3);
+          assert.equal(shapes.length, 3);
+        '''
+        result = subprocess.run(
+            ["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20,
+        )
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def setUp(self) -> None:
         self.tempdir = tempfile.TemporaryDirectory(dir=ROOT)
         self.addCleanup(self.tempdir.cleanup)
@@ -552,8 +773,15 @@ class AssessmentPptxTests(unittest.TestCase):
         self.assertEqual(manifest.read_bytes(), b"preserve me")
         self.assertFalse(output.exists())
 
-    @unittest.skipUnless(shutil.which("node") and SETUP.is_file(), "bundled artifact runtime unavailable")
+    @unittest.skipUnless(shutil.which("node") and (SETUP.is_file() or BUNDLED_ARTIFACT_AVAILABLE), "bundled artifact runtime unavailable")
     def test_builds_editable_pptx_with_sources_and_renders(self) -> None:
+        self._exercise_build()
+
+    @unittest.skipUnless(shutil.which("node") and BUNDLED_ARTIFACT_AVAILABLE and os.name == "posix", "bundled v5 candidate runtime unavailable")
+    def test_builds_private_v5_candidate_without_normal_publication(self) -> None:
+        self._exercise_build(candidate=True)
+
+    def _exercise_build(self, candidate=False) -> None:
         model = valid_model()
         model["target"] = (
             "Synthetic MCP Extension (example.synthetic-mcp) with a deliberately "
@@ -622,15 +850,19 @@ class AssessmentPptxTests(unittest.TestCase):
         shutil.copytree(pillow_metadata, fixture_site / pillow_metadata.name)
         workspace = runtime_root / "artifact-workspace"
         workspace.mkdir()
-        setup = subprocess.run(
-            ["node", str(SETUP), "--workspace", str(workspace)],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=120,
-        )
-        self.assertEqual(setup.returncode, 0, setup.stderr)
+        if BUNDLED_ARTIFACT_AVAILABLE:
+            (workspace / "package.json").write_text(json.dumps({"private": True, "type": "module"}), encoding="utf-8")
+            (workspace / "node_modules").symlink_to(ARTIFACT_NODE_MODULES, target_is_directory=True)
+        else:
+            setup = subprocess.run(
+                ["node", str(SETUP), "--workspace", str(workspace)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=120,
+            )
+            self.assertEqual(setup.returncode, 0, setup.stderr)
         output = self.root / "assessment.pptx"
         manifest = self.root / "assessment-build.json"
         qa = self.root / "qa"
@@ -642,6 +874,49 @@ class AssessmentPptxTests(unittest.TestCase):
         )
         self.assertEqual(receipt_result.returncode, 0, receipt_result.stderr)
         qa.mkdir()
+        if candidate:
+            candidate_dir = self.root / "private-v5-candidate"
+            result = self.run_builder("--stage-root", str(self.stage_root),
+                "--v5-candidate-dir", str(candidate_dir), "--workspace", str(workspace),
+                "--artifact-runtime-receipt", str(receipt), "--montage-helper", str(trusted_montage),
+                "--python", str(python_launcher), *word_args)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            summary = json.loads(result.stdout.strip().splitlines()[-1])
+            self.assertEqual(summary["status"], "Pending native measurement")
+            self.assertNotIn("output", summary)
+            self.assertFalse(output.exists())
+            self.assertFalse(manifest.exists())
+            self.assertEqual(candidate_dir.stat().st_mode & 0o777, 0o700)
+            payload = json.loads((candidate_dir / "candidate.json").read_text())
+            self.assertEqual(payload["status"], "Pending native measurement")
+            self.assertTrue(payload["nativeMeasurementsRequired"])
+            self.assertEqual(payload["native_powerpoint_closeout"], "Pending")
+            self.assertEqual(payload["human_acceptance"], "Pending")
+            self.assertEqual(payload["layout_schema"], "openai.presentation.layout/v5")
+            for item in payload["files"]:
+                data = (candidate_dir / item["file"]).read_bytes()
+                self.assertEqual(len(data), item["size"])
+                self.assertEqual(hashlib.sha256(data).hexdigest(), item["sha256"])
+                self.assertEqual((candidate_dir / item["file"]).stat().st_mode & 0o777, 0o400)
+            self.assertEqual(payload["candidate_pptx_sha256"], hashlib.sha256((candidate_dir / "candidate.pptx").read_bytes()).hexdigest())
+            authoring = json.loads((candidate_dir / "authoring.json").read_text())
+            self.assertEqual([x["slide"] for x in authoring["slides"]], list(range(1, payload["slide_count"] + 1)))
+            for slide in authoring["slides"]:
+                self.assertTrue(slide["authored"])
+                layout = json.loads((candidate_dir / slide["layout"]).read_text())
+                self.assertEqual(layout["schema"], "openai.presentation.layout/v5")
+            for relative, digest in payload["source_bindings"].items():
+                self.assertEqual(hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), digest)
+            # The same actual runtime remains refused by the normal measured path.
+            refused = self.run_builder("--stage-root", str(self.stage_root), "--output", str(output),
+                "--build-manifest", str(manifest), "--workspace", str(workspace),
+                "--artifact-runtime-receipt", str(receipt), "--qa-dir", str(qa),
+                "--montage-helper", str(trusted_montage), "--python", str(python_launcher), *word_args)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("unsupported layout manifest", refused.stderr)
+            self.assertFalse(output.exists())
+            self.assertFalse(manifest.exists())
+            return  # Never enter the production acceptance-receipt writer below.
         result = self.run_builder(
             "--stage-root", str(self.stage_root),
             "--output", str(output),
@@ -730,6 +1005,13 @@ class AssessmentPptxTests(unittest.TestCase):
             bound_files = (
                 "scripts/build_assessment_pptx.mjs",
                 "scripts/create_artifact_runtime_receipt.mjs",
+                "scripts/stable_regular_file.mjs",
+                "scripts/native_pptx_text.py",
+                "scripts/test_native_pptx_text.py",
+                "scripts/render_presentations_with_powerpoint.applescript",
+                "scripts/render_presentations_with_powerpoint.ps1",
+                "scripts/stage_office_artifact.py",
+                "scripts/test_powerpoint_path_identity.py",
                 "scripts/create_pptx_montage.py",
                 "scripts/portable_fs.py",
                 "scripts/requirements.lock",

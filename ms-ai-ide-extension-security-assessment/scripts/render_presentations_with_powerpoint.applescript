@@ -99,6 +99,21 @@ on publishOutput(temporaryOutput, outputPath)
     end if
 end publishOutput
 
+on canonicalOfficePath(nativeFullName)
+    try
+        -- Office may report HFS paths or a /tmp alias for a /private/tmp file.
+        -- Resolve the full file identity; never select a document by basename.
+        if nativeFullName starts with "/" then
+            set nativePath to POSIX path of ((POSIX file nativeFullName) as alias)
+        else
+            set nativePath to POSIX path of (nativeFullName as alias)
+        end if
+        return do shell script "/bin/realpath " & quoted form of nativePath
+    on error
+        return ""
+    end try
+end canonicalOfficePath
+
 on run argv
     if (count of argv) is less than 5 or ((count of argv) - 3) mod 2 is not 0 then
         error "usage: render_presentations_with_powerpoint.applescript OUTPUT_DIR PYTHON STAGER PRESENTATION.pptx SHA256 [...]"
@@ -133,35 +148,51 @@ on run argv
             set stagedPath to stagePresentation(inputPath, expectedHash, taskDirectory, pythonPath, stagerPath)
             set temporaryOutput to taskDirectory & "/output.pdf"
             set stagedFile to POSIX file stagedPath
+            with timeout of 60 seconds
             tell application "Microsoft PowerPoint"
                 open stagedFile
                 set currentPresentations to every presentation
                 repeat with candidatePresentation in currentPresentations
-                    if (full name of candidatePresentation as text) is stagedPath then
+                    set candidatePath to my canonicalOfficePath(full name of candidatePresentation as text)
+                    if candidatePath is stagedPath then
                         set my openedPresentation to candidatePresentation
                         exit repeat
                     end if
                 end repeat
                 if my openedPresentation is missing value then error "PowerPoint did not expose the unique staged QA presentation"
+                if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity changed before export"
                 set presentationSlides to count slides of (my openedPresentation)
                 save my openedPresentation in POSIX file temporaryOutput as save as PDF
                 do shell script "/bin/test -s " & quoted form of temporaryOutput
+                if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity changed before close"
                 close my openedPresentation saving no
                 set my openedPresentation to missing value
             end tell
+            end timeout
             publishOutput(temporaryOutput, outputPath)
             cleanupTaskDirectory(taskDirectory, qaRoot)
             set taskDirectory to missing value
             set end of renderedPresentations to presentationStem & tab & (presentationSlides as text) & tab & outputPath
         on error errorMessage number errorNumber
-            tell application "Microsoft PowerPoint"
+            if my openedPresentation is not missing value then
                 try
-                    close my openedPresentation saving no
+                    with timeout of 10 seconds
+                        tell application "Microsoft PowerPoint"
+                            if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity unavailable or changed; retaining private stage"
+                            close my openedPresentation saving no
+                        end tell
+                    end timeout
+                    set my openedPresentation to missing value
+                    cleanupTaskDirectory(taskDirectory, qaRoot)
+                    set taskDirectory to missing value
                 end try
-            end tell
-            try
-                cleanupTaskDirectory(taskDirectory, qaRoot)
-            end try
+            end if
+            -- If Office never exposed the staged identity, a file-access prompt
+            -- may still reference it. Retain this private task directory for
+            -- explicit operator cleanup rather than deleting a pending input.
+            if taskDirectory is not missing value then
+                set errorMessage to errorMessage & "; private QA stage retained at " & taskDirectory
+            end if
             error "PowerPoint render failed for " & inputPath & ": " & errorMessage number errorNumber
         end try
     end repeat

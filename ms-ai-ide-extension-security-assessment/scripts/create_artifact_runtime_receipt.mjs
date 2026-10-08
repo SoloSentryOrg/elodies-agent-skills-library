@@ -4,7 +4,7 @@
 
 import crypto from "node:crypto";
 import fs from "node:fs/promises";
-import { constants as fsConstants } from "node:fs";
+import { readStableRegularFile } from "./stable_regular_file.mjs";
 import path from "node:path";
 import process from "node:process";
 import { createRequire } from "node:module";
@@ -15,22 +15,8 @@ function fail(message) {
 }
 
 async function stableFile(filename, field) {
-  let handle;
-  try {
-    const pathInfo = await fs.lstat(filename);
-    if (!pathInfo.isFile() || pathInfo.isSymbolicLink()) throw new Error(`${field} must be a regular non-symlink file`);
-    handle = await fs.open(filename, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
-    const before = await handle.stat();
-    if (!before.isFile() || before.size > 64 * 1024 * 1024) throw new Error(`${field} must be a bounded regular file`);
-    const data = await handle.readFile();
-    const after = await handle.stat();
-    if (pathInfo.dev !== before.dev || pathInfo.ino !== before.ino || before.dev !== after.dev || before.ino !== after.ino || before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
-      throw new Error(`${field} changed while being read`);
-    }
-    return data;
-  } finally {
-    if (handle) await handle.close();
-  }
+  const { data } = await readStableRegularFile(filename, field, 64 * 1024 * 1024);
+  return data;
 }
 
 function digest(data) { return crypto.createHash("sha256").update(data).digest("hex"); }
