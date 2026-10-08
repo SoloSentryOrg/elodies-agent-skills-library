@@ -47,8 +47,8 @@
     },
     {
       "path": "references/portable-execution.md",
-      "sha256": "17ca178fe1d1ae4bff3a1fb5ba42866f5872c585d9c17254e57d17425167dccc",
-      "size": 10738
+      "sha256": "defb38bc4ef9a6f16b36f74bef4978ffbc62a45f4e0838c94bd5e33e10b79ec5",
+      "size": 12496
     },
     {
       "path": "references/prerequisites.md",
@@ -107,8 +107,8 @@
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "5a78713943101b35261ecc59b62eab80a9e8ea0d9b1912421258093977f550bc",
-      "size": 76652
+      "sha256": "28ed6cd6e14d3c03292f43ec31917a15308533e49ee389df94573657a50b31fe",
+      "size": 83334
     },
     {
       "path": "scripts/build_release_archive.py",
@@ -232,8 +232,8 @@
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
-      "sha256": "06f4bb04bfcf9b02d4d583346faf5831dd9f3f5857aae2f2724fe83b34e6022c",
-      "size": 49219
+      "sha256": "3443a9262acdb985a6b8a72192b6176363b5bbc78be8bc9ac4e755a22ca08b41",
+      "size": 55532
     },
     {
       "path": "scripts/test_create_word_qa_contact_sheets.py",

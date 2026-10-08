@@ -182,3 +182,33 @@ Primary sources: [PDFium fix](https://pdfium.googlesource.com/pdfium/+/4a3662822
 [fixed Chrome dependency pin](https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/DEPS),
 [upstream native build](https://github.com/bblanchon/pdfium-binaries/actions/runs/36410865276/attempts/2),
 [pypdfium2 release](https://github.com/pypdfium2-team/pypdfium2/releases/tag/5.14.0).
+
+
+## Private v5 PowerPoint candidates
+
+Use the explicit `--v5-candidate-dir NEW_DIRECTORY` builder mode only to prepare
+private, editable candidates for native measurement. Supply the existing bound
+assessment/Word inputs, artifact workspace/runtime receipt, receipt-bound montage
+helper and Python runtime. Do not supply normal `--output`, `--build-manifest`,
+`--qa-dir` or `--validate-only` arguments with this mode.
+
+The directory must be new and inside the declared workspace. POSIX permissions
+are created and checked as `0700`; contained evidence files use `0400`. Native
+Windows private-directory ACL assurance is not established by this mode, so
+candidate staging on Windows remains unsupported. Licensed Windows Office
+adapter acceptance remains a separate requirement.
+
+Candidate mode requests the documented full v5 layout export and runs the full
+structural/authoring validator. It retains ordered authored frames, complete v5
+layouts, editable PPTX, runtime receipt, input bindings and current source hashes.
+The manifest is `solosentry.pptx.v5-candidate/v1`, with status **Pending native
+measurement** and native Office/human acceptance **Pending**. It does not produce
+a normal output build manifest or any production acceptance receipt. Structural
+geometry, nominal font values and candidate PNG previews do not prove rendered
+font size, wrapping, visual quality or acceptance.
+
+The normal builder retains its v4 measured-layout gate and refuses v5 evidence.
+A later reviewed coordinator must bind the freshly exported native Office PDF
+to these exact candidate identities, obtain contained native measurements on an
+approved Linux/Windows worker, and preserve source-bound runtime and human
+acceptance gates before any production promotion.

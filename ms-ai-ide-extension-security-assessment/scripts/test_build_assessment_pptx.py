@@ -172,6 +172,49 @@ class AssessmentPptxTests(unittest.TestCase):
         result = subprocess.run(["node", "-e", probe, str(SCRIPT)], capture_output=True, text=True, timeout=20)
         self.assertEqual(result.returncode, 0, result.stderr)
 
+    def test_private_candidate_hash_and_mode_boundaries(self) -> None:
+        evidence = self.root / "bound.layout.json"
+        evidence.write_text('{"schema":"openai.presentation.layout/v5"}', encoding="utf-8")
+        probe = r'''
+          const fs = require("node:fs");
+          const fsp = require("node:fs/promises");
+          const vm = require("node:vm");
+          const path = require("node:path");
+          const crypto = require("node:crypto");
+          const assert = require("node:assert/strict");
+          const source = fs.readFileSync(process.argv[1], "utf8");
+          const begin = source.indexOf("async function verifyCandidateFiles(");
+          const end = source.indexOf("\nasync function buildPrivateV5Candidate(", begin);
+          const sha256 = data => crypto.createHash("sha256").update(data).digest("hex");
+          const check = vm.runInNewContext(`(${source.slice(begin, end)})`, {
+            ModelError: Error, path, sha256,
+            readStableRegularFile: async file => ({data: await fsp.readFile(file)}),
+          }, {timeout: 1000});
+          const argStart = source.indexOf("function parseArgs(");
+          const argEnd = source.indexOf("\nfunction text(", argStart);
+          const parse = vm.runInNewContext(`(${source.slice(argStart, argEnd)})`, {
+            ModelError: Error, process: {env: {}},
+          }, {timeout: 1000});
+          const directory = process.argv[2];
+          const file = path.join(directory, "bound.layout.json");
+          const data = fs.readFileSync(file);
+          const binding = {file: "bound.layout.json", size: data.length, sha256: sha256(data)};
+          (async () => {
+            await check(directory, [binding]);
+            await assert.rejects(check(directory, [{...binding, sha256: "0".repeat(64)}]), /immutable binding/);
+            await assert.rejects(check(directory, [{...binding, file: "../escape.json"}]), /invalid/);
+            await assert.rejects(check(directory, [binding, binding]), /invalid/);
+            await fsp.writeFile(file, Buffer.concat([data, Buffer.from("changed")]));
+            await assert.rejects(check(directory, [binding]), /immutable binding/);
+            for (const incompatible of [["--output", "normal.pptx"], ["--build-manifest", "normal.json"],
+                ["--qa-dir", "normal-qa"], ["--validate-only"]]) {
+              assert.throws(() => parse(["--v5-candidate-dir", "private", ...incompatible]), /cannot use normal/);
+            }
+          })().catch(error => { console.error(error); process.exitCode = 1; });
+        '''
+        result = subprocess.run(["node", "-e", probe, str(SCRIPT), str(self.root)], capture_output=True, text=True, timeout=20)
+        self.assertEqual(result.returncode, 0, result.stderr)
+
     def test_layout_gate_rejects_incomplete_rendering_evidence(self) -> None:
         """Exercise the actual guard with malformed evidence, not authored models."""
         probe = r'''
@@ -732,6 +775,13 @@ class AssessmentPptxTests(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which("node") and (SETUP.is_file() or BUNDLED_ARTIFACT_AVAILABLE), "bundled artifact runtime unavailable")
     def test_builds_editable_pptx_with_sources_and_renders(self) -> None:
+        self._exercise_build()
+
+    @unittest.skipUnless(shutil.which("node") and BUNDLED_ARTIFACT_AVAILABLE and os.name == "posix", "bundled v5 candidate runtime unavailable")
+    def test_builds_private_v5_candidate_without_normal_publication(self) -> None:
+        self._exercise_build(candidate=True)
+
+    def _exercise_build(self, candidate=False) -> None:
         model = valid_model()
         model["target"] = (
             "Synthetic MCP Extension (example.synthetic-mcp) with a deliberately "
@@ -824,6 +874,49 @@ class AssessmentPptxTests(unittest.TestCase):
         )
         self.assertEqual(receipt_result.returncode, 0, receipt_result.stderr)
         qa.mkdir()
+        if candidate:
+            candidate_dir = self.root / "private-v5-candidate"
+            result = self.run_builder("--stage-root", str(self.stage_root),
+                "--v5-candidate-dir", str(candidate_dir), "--workspace", str(workspace),
+                "--artifact-runtime-receipt", str(receipt), "--montage-helper", str(trusted_montage),
+                "--python", str(python_launcher), *word_args)
+            self.assertEqual(result.returncode, 0, result.stderr)
+            summary = json.loads(result.stdout.strip().splitlines()[-1])
+            self.assertEqual(summary["status"], "Pending native measurement")
+            self.assertNotIn("output", summary)
+            self.assertFalse(output.exists())
+            self.assertFalse(manifest.exists())
+            self.assertEqual(candidate_dir.stat().st_mode & 0o777, 0o700)
+            payload = json.loads((candidate_dir / "candidate.json").read_text())
+            self.assertEqual(payload["status"], "Pending native measurement")
+            self.assertTrue(payload["nativeMeasurementsRequired"])
+            self.assertEqual(payload["native_powerpoint_closeout"], "Pending")
+            self.assertEqual(payload["human_acceptance"], "Pending")
+            self.assertEqual(payload["layout_schema"], "openai.presentation.layout/v5")
+            for item in payload["files"]:
+                data = (candidate_dir / item["file"]).read_bytes()
+                self.assertEqual(len(data), item["size"])
+                self.assertEqual(hashlib.sha256(data).hexdigest(), item["sha256"])
+                self.assertEqual((candidate_dir / item["file"]).stat().st_mode & 0o777, 0o400)
+            self.assertEqual(payload["candidate_pptx_sha256"], hashlib.sha256((candidate_dir / "candidate.pptx").read_bytes()).hexdigest())
+            authoring = json.loads((candidate_dir / "authoring.json").read_text())
+            self.assertEqual([x["slide"] for x in authoring["slides"]], list(range(1, payload["slide_count"] + 1)))
+            for slide in authoring["slides"]:
+                self.assertTrue(slide["authored"])
+                layout = json.loads((candidate_dir / slide["layout"]).read_text())
+                self.assertEqual(layout["schema"], "openai.presentation.layout/v5")
+            for relative, digest in payload["source_bindings"].items():
+                self.assertEqual(hashlib.sha256((ROOT / relative).read_bytes()).hexdigest(), digest)
+            # The same actual runtime remains refused by the normal measured path.
+            refused = self.run_builder("--stage-root", str(self.stage_root), "--output", str(output),
+                "--build-manifest", str(manifest), "--workspace", str(workspace),
+                "--artifact-runtime-receipt", str(receipt), "--qa-dir", str(qa),
+                "--montage-helper", str(trusted_montage), "--python", str(python_launcher), *word_args)
+            self.assertNotEqual(refused.returncode, 0)
+            self.assertIn("unsupported layout manifest", refused.stderr)
+            self.assertFalse(output.exists())
+            self.assertFalse(manifest.exists())
+            return  # Never enter the production acceptance-receipt writer below.
         result = self.run_builder(
             "--stage-root", str(self.stage_root),
             "--output", str(output),
