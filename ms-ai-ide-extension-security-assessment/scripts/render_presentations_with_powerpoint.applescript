@@ -160,9 +160,11 @@ on run argv
                     end if
                 end repeat
                 if my openedPresentation is missing value then error "PowerPoint did not expose the unique staged QA presentation"
+                if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity changed before export"
                 set presentationSlides to count slides of (my openedPresentation)
                 save my openedPresentation in POSIX file temporaryOutput as save as PDF
                 do shell script "/bin/test -s " & quoted form of temporaryOutput
+                if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity changed before close"
                 close my openedPresentation saving no
                 set my openedPresentation to missing value
             end tell
@@ -175,7 +177,10 @@ on run argv
             if my openedPresentation is not missing value then
                 try
                     with timeout of 10 seconds
-                        tell application "Microsoft PowerPoint" to close my openedPresentation saving no
+                        tell application "Microsoft PowerPoint"
+                            if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity unavailable or changed; retaining private stage"
+                            close my openedPresentation saving no
+                        end tell
                     end timeout
                     set my openedPresentation to missing value
                     cleanupTaskDirectory(taskDirectory, qaRoot)

@@ -36,6 +36,8 @@ def _presentation_skill_dir() -> Path:
 
 SKILL_DIR = _presentation_skill_dir()
 SETUP = SKILL_DIR / "container_tools" / "setup_artifact_tool_workspace.mjs"
+ARTIFACT_NODE_MODULES = Path(os.environ["CODEX_ARTIFACT_NODE_MODULES"]).expanduser().resolve() if os.environ.get("CODEX_ARTIFACT_NODE_MODULES") else None
+BUNDLED_ARTIFACT_AVAILABLE = ARTIFACT_NODE_MODULES is not None and (ARTIFACT_NODE_MODULES / "@oai" / "artifact-tool" / "package.json").is_file()
 def valid_model() -> dict[str, object]:
     references = [
         {
@@ -728,7 +730,7 @@ class AssessmentPptxTests(unittest.TestCase):
         self.assertEqual(manifest.read_bytes(), b"preserve me")
         self.assertFalse(output.exists())
 
-    @unittest.skipUnless(shutil.which("node") and SETUP.is_file(), "bundled artifact runtime unavailable")
+    @unittest.skipUnless(shutil.which("node") and (SETUP.is_file() or BUNDLED_ARTIFACT_AVAILABLE), "bundled artifact runtime unavailable")
     def test_builds_editable_pptx_with_sources_and_renders(self) -> None:
         model = valid_model()
         model["target"] = (
@@ -798,15 +800,19 @@ class AssessmentPptxTests(unittest.TestCase):
         shutil.copytree(pillow_metadata, fixture_site / pillow_metadata.name)
         workspace = runtime_root / "artifact-workspace"
         workspace.mkdir()
-        setup = subprocess.run(
-            ["node", str(SETUP), "--workspace", str(workspace)],
-            cwd=ROOT,
-            text=True,
-            capture_output=True,
-            check=False,
-            timeout=120,
-        )
-        self.assertEqual(setup.returncode, 0, setup.stderr)
+        if BUNDLED_ARTIFACT_AVAILABLE:
+            (workspace / "package.json").write_text(json.dumps({"private": True, "type": "module"}), encoding="utf-8")
+            (workspace / "node_modules").symlink_to(ARTIFACT_NODE_MODULES, target_is_directory=True)
+        else:
+            setup = subprocess.run(
+                ["node", str(SETUP), "--workspace", str(workspace)],
+                cwd=ROOT,
+                text=True,
+                capture_output=True,
+                check=False,
+                timeout=120,
+            )
+            self.assertEqual(setup.returncode, 0, setup.stderr)
         output = self.root / "assessment.pptx"
         manifest = self.root / "assessment-build.json"
         qa = self.root / "qa"

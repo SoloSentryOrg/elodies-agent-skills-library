@@ -162,8 +162,8 @@
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.applescript",
-      "sha256": "444cf3a19d8e3349c7ea2cc39337a5e0fde42ee7646ca87487ad09e2ecf824d9",
-      "size": 10563
+      "sha256": "afeb633cfacf00a24aeb897295a923e05da1331523cb8fda869c74d02b90bdae",
+      "size": 11141
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.ps1",
@@ -227,8 +227,8 @@
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
-      "sha256": "2835d5c67639bd39b0195541e726d563bafc804521d1ce72b5cb5597575a06c4",
-      "size": 48579
+      "sha256": "06f4bb04bfcf9b02d4d583346faf5831dd9f3f5857aae2f2724fe83b34e6022c",
+      "size": 49219
     },
     {
       "path": "scripts/test_create_word_qa_contact_sheets.py",
