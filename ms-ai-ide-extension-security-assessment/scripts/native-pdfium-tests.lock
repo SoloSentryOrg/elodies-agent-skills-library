@@ -1,0 +1,6 @@
+# Native PDF parser acceptance-test environment only; not production approval.
+# Exact supported runner wheels; binary-only installation is required.
+pypdfium2==5.14.0 \
+    --hash=sha256:2de384df66ba55fcaab0775f30f28ec1090af3dfa60276a07821efc96d993118 \
+    --hash=sha256:11f281613fa22313d9c7ab89947665e84eccf8ebe40e1198a84a88352305648d \
+    --hash=sha256:149fd5c6397b8df8bf7911a93506eff0be874f877afe7ac936cf5d37d21a6a06

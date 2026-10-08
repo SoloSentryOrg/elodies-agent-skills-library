@@ -4,6 +4,7 @@
 import copy
 import ctypes
 import hashlib
+import contextlib
 import importlib.util
 import json
 import math
@@ -83,6 +84,32 @@ class NativeExtractionTests(unittest.TestCase):
         for options in [{"rotation": 90}, {"canvas": "1280 720"}]:
             with self.subTest(options=options), self.assertRaisesRegex(NativeTextError, "canvas or rotation"):
                 extract_native_pdf(native_pdf(**options))
+
+    def test_real_extraction_never_activates_form_callbacks(self):
+        # Actual supported parser and ordinary/form-bearing PDFs. These guards
+        # observe the specific interface named by CVE-2026-95338, not a mock
+        # substitute for PDF text extraction or a blanket vulnerability claim.
+        import pypdfium2 as pdfium
+        import pypdfium2.raw as raw
+        names = ("FPDFDOC_InitFormFillEnvironment", "FORM_OnAfterLoadPage",
+                 "FORM_OnBeforeClosePage", "FORM_DoDocumentJSAction",
+                 "FORM_DoDocumentOpenAction", "FORM_DoPageAAction")
+        with contextlib.ExitStack() as stack:
+            guarded = [stack.enter_context(mock.patch.object(
+                raw, name, side_effect=AssertionError("unexpected form activation")))
+                for name in names]
+            pages = extract_native_pdf(native_pdf())
+            self.assertEqual(len(pages), 1)
+            with self.assertRaisesRegex(NativeTextError, "unsupported form"):
+                extract_native_pdf(native_pdf(form=True))
+            for call in guarded:
+                call.assert_not_called()
+            # Positive control: the observed namespace is the actual helper
+            # interface, so explicit activation must reach the rejection guard.
+            with pdfium.PdfDocument(native_pdf(form=True)) as document:
+                with self.assertRaisesRegex(AssertionError, "unexpected form activation"):
+                    document.init_forms()
+            self.assertEqual(guarded[0].call_count, 1)
 
     def test_real_pdf_forms_reject_before_measurement(self):
         with self.assertRaisesRegex(NativeTextError, "unsupported form"):

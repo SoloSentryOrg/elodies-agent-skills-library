@@ -47,8 +47,8 @@
     },
     {
       "path": "references/portable-execution.md",
-      "sha256": "01ebca2d5471b32e794e2ddf39582290f6279e0fb65b9e96f1912d5c18ee8a69",
-      "size": 8971
+      "sha256": "17ca178fe1d1ae4bff3a1fb5ba42866f5872c585d9c17254e57d17425167dccc",
+      "size": 10738
     },
     {
       "path": "references/prerequisites.md",
@@ -151,6 +151,11 @@
       "size": 19744
     },
     {
+      "path": "scripts/native-pdfium-tests.lock",
+      "sha256": "4892e119e61ca0f0a1ac8c8aca599afaed86fd6850f638757a3e8a8d6d3735e9",
+      "size": 423
+    },
+    {
       "path": "scripts/native_pptx_text.py",
       "sha256": "71d334a505d6ab85b635497f5ba3e508b413eecde843321b0318b54f63541456",
       "size": 38576
@@ -242,8 +247,8 @@
     },
     {
       "path": "scripts/test_native_pptx_text.py",
-      "sha256": "4ac29dba9f88e232272f4418d96705769ade2472ec3e08b0f054946465eb86b4",
-      "size": 39504
+      "sha256": "aa8fc13be3bbc79fb490bacae9d3c58681655bb86597ce15ca0778c1d2fce6ec",
+      "size": 41062
     },
     {
       "path": "scripts/test_portable_fs.py",

@@ -156,3 +156,29 @@ junctions, and reparse-point ancestors, bind reads to the opened file identity,
 and use exclusive creation in trusted NTFS workspaces. A filesystem that cannot
 provide these semantics is unsupported and must be recorded as `Blocked` rather
 than silently weakened.
+
+## Native parser test evidence
+
+The hosted Linux and Windows regression jobs install the separate hash-locked
+`scripts/native-pdfium-tests.lock` with binary-only/no-dependency installation.
+This selects supported pypdfium2 5.14.0 wheels for those runners and macOS ARM64
+acceptance testing; it does not add a production parser dependency or establish
+production acceptance. Verbose tests distinguish actual parser executions from
+platform/prerequisite skips. The form-interface probe checks genuine ordinary
+and form-bearing PDFs and rejects unexpected form initialization/actions.
+
+CVE-2026-95338 maps through Chromium issue 556535630 to PDFium fix
+`4a36628222bb647c23b4ef3b8f3fc64e93e1dd3b` (8 September 2026), with stable
+backport `2358b16c1947eff67f0732754af6b3c4e1715ff9`. Fixed Chrome
+154.0.8037.57 pins that backport. Public PDFium chromium/8076 history includes
+the original fix; upstream 28 September builds and signed 29 September archives
+match all three selected wheel native binaries. The upstream attestation binds
+the binary-builder source, not an immutable resolved PDFium checkout SHA; keep
+that qualification. Source and runtime form-interface evidence concern this
+extractor's usage, not absence of all PDFium vulnerabilities. Production pipeline,
+source-bound runtime acceptance and licensed native Windows Office remain gates.
+
+Primary sources: [PDFium fix](https://pdfium.googlesource.com/pdfium/+/4a36628222bb647c23b4ef3b8f3fc64e93e1dd3b),
+[fixed Chrome dependency pin](https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/DEPS),
+[upstream native build](https://github.com/bblanchon/pdfium-binaries/actions/runs/36410865276/attempts/2),
+[pypdfium2 release](https://github.com/pypdfium2-team/pypdfium2/releases/tag/5.14.0).

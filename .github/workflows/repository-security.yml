@@ -35,6 +35,12 @@ jobs:
           --only-binary=:all: --require-hashes
           -r ms-ai-ide-extension-security-assessment/scripts/requirements.lock
 
+      - name: Install hash-locked native parser for acceptance tests
+        run: >-
+          python3 -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes --no-deps
+          -r ms-ai-ide-extension-security-assessment/scripts/native-pdfium-tests.lock
+
       - name: Validate portable skill package
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -46,7 +52,7 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
-          python3 -m unittest discover
+          python3 -m unittest discover -v
           -s ms-ai-ide-extension-security-assessment/scripts
           -p 'test_*.py'
 
@@ -99,6 +105,12 @@ jobs:
           --only-binary=:all: --require-hashes
           -r ms-ai-ide-extension-security-assessment/scripts/requirements.lock
 
+      - name: Install hash-locked native parser for acceptance tests
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes --no-deps
+          -r ms-ai-ide-extension-security-assessment/scripts/native-pdfium-tests.lock
+
       - name: Validate complete portable package
         env:
           PYTHONDONTWRITEBYTECODE: "1"
@@ -110,7 +122,7 @@ jobs:
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
-          python -m unittest discover
+          python -m unittest discover -v
           -s ms-ai-ide-extension-security-assessment/scripts
           -p 'test_*.py'
 
