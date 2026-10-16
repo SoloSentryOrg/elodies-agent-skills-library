@@ -42,8 +42,8 @@
     },
     {
       "path": "references/office-artifact-workflow.md",
-      "sha256": "5edb26ada05278cad09156e6e9b2dd36b5f3a188fe776d2311c8aafa3aae3ae9",
-      "size": 5253
+      "sha256": "ac731b0c0497bcafc1385d7035e291dc3c9bccb457eb313c1820948f823edd89",
+      "size": 5688
     },
     {
       "path": "references/portable-execution.md",
@@ -107,8 +107,8 @@
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "28ed6cd6e14d3c03292f43ec31917a15308533e49ee389df94573657a50b31fe",
-      "size": 83334
+      "sha256": "443f48f79d28a24ee5d78045e2f442a4e21536478cc14e3d1f8fabf8dd581a30",
+      "size": 83360
     },
     {
       "path": "scripts/build_release_archive.py",
@@ -291,6 +291,11 @@
       "size": 12078
     },
     {
+      "path": "scripts/test_verify_v5_candidate.py",
+      "sha256": "b5376de1abf10e32d74e575acd216aa7010a43df4f333497f66f034452c68623",
+      "size": 7508
+    },
+    {
       "path": "scripts/validate_assessment_layout.py",
       "sha256": "d4f32fffc7fa3e414b7dded4281157289dd11b4703366e55161e71e7bf5592a6",
       "size": 19056
@@ -307,13 +312,18 @@
     },
     {
       "path": "scripts/validate_pptx_runtime_acceptance.py",
-      "sha256": "0ab7b01079cbb757ee21609ae6bc53fcbc3f44cd63dd18e736e42ca6d0cb2797",
-      "size": 3151
+      "sha256": "011e3ee7294f866d3dd87d43649af09c0be555cbf640a3e56a059656589a90c7",
+      "size": 3189
     },
     {
       "path": "scripts/validate_skill_package.py",
       "sha256": "481c86012097de0bdcd465c95ace74734d900f540d77cdff4a29e5feb19631e4",
       "size": 9024
+    },
+    {
+      "path": "scripts/verify_v5_candidate.py",
+      "sha256": "e05514256ce6f81b478ef006bb242f6b3dd25dc52845f2e3867902e5f1662712",
+      "size": 16374
     },
     {
       "path": "SKILL.md",

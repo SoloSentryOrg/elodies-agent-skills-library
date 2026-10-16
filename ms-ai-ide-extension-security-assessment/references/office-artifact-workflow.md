@@ -71,6 +71,12 @@ source.
 5. Render every slide, inspect each at full size, and resolve all overflow,
    unintended overlap, clipping, wrapping, placeholder, connector, and source
    defects. Perform final format-sensitive inspection in installed PowerPoint.
+6. For a private v5 candidate, run `scripts/verify_v5_candidate.py` with
+   `--candidate-dir` and `--output` in separate private (`0700`) directories.
+   Transfer its source-bound, read-only request and candidate to the approved
+   native host without publishing either. The request remains `Pending native
+   rendering`: it is not a native measurement, visual review, acceptance
+   receipt, or permission to release the presentation.
 
 ## Spreadsheet and PDF routes
 

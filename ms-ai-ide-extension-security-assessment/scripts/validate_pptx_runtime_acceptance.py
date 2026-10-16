@@ -27,6 +27,7 @@ BOUND_FILES = (
     "scripts/secure_pptx_stage_bundle.py",
     "scripts/validate_assessment_pptx.py",
     "scripts/test_build_assessment_pptx.py",
+    "scripts/verify_v5_candidate.py",
 )
 SHA = re.compile(r"^[0-9a-f]{64}$")
 
