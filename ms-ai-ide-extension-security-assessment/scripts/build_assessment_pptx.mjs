@@ -3,6 +3,7 @@
 /** Build an editable PowerPoint derivative from a validated assessment model. */
 
 import fs from "node:fs/promises";
+import { readStableRegularFile as readDescriptorFile } from "./stable_regular_file.mjs";
 import path from "node:path";
 import process from "node:process";
 import crypto from "node:crypto";
@@ -1142,25 +1143,10 @@ async function buildDeck(model, output, qaDir, workspace, artifactRuntimeReceipt
 }
 
 async function readStableRegularFile(filename, field) {
-  let handle;
   try {
-    const pathInfo = await fs.lstat(filename);
-    if (!pathInfo.isFile() || pathInfo.isSymbolicLink()) throw new ModelError(`${field} must be a regular non-symlink file`);
-    handle = await fs.open(filename, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
-    const before = await handle.stat();
-    if (!before.isFile()) throw new ModelError(`${field} must be a regular non-symlink file`);
-    const data = await handle.readFile();
-    const after = await handle.stat();
-    if (pathInfo.dev !== before.dev || pathInfo.ino !== before.ino || data.length !== before.size || before.dev !== after.dev || before.ino !== after.ino
-      || before.size !== after.size || before.mtimeMs !== after.mtimeMs) {
-      throw new ModelError(`${field} changed while being read`);
-    }
-    return { data, stat: after };
-  } catch (error) {
-    if (error instanceof ModelError) throw error;
-    throw new ModelError(`${field} must be a stable regular non-symlink file`);
-  } finally {
-    if (handle) await handle.close();
+    return await readDescriptorFile(filename, field);
+  } catch {
+    throw new ModelError(`${field} must be a stable bounded regular non-symlink file`);
   }
 }
 
@@ -1179,7 +1165,7 @@ async function qaBindings(qaPath) {
     if (name.includes("/") || name.includes("\\") || name === "." || name === "..") throw new ModelError("QA output contains an unsafe filename");
     const filename = path.join(qaPath, name);
     const { data, stat } = await readStableRegularFile(filename, `QA file ${name}`);
-    const pathInfo = await fs.lstat(filename);
+    const pathInfo = await fs.lstat(filename, { bigint: true });
     if (pathInfo.dev !== stat.dev || pathInfo.ino !== stat.ino) throw new ModelError(`QA file ${name} changed identity while being bound`);
     bindings.push({ file: name, sha256: sha256(data) });
   }
