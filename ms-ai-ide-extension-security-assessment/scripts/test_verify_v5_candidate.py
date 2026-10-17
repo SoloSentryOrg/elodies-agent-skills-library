@@ -151,6 +151,7 @@ class CandidateTransportTests(unittest.TestCase):
             capture(self.source, self.candidate, request_path, staged, python,
                     request_sha256=digest(encoded(request)), host_platform="darwin")
 
+    @unittest.skipUnless(os.name == "posix", "POSIX-only native proof check")
     def test_native_adapter_provenance_rejects_retained_stage_without_receipt(self) -> None:
         request_path, staged, pdf, request = self._native_render_inputs()
         def retained_stage(command, **_kwargs):
@@ -158,7 +159,8 @@ class CandidateTransportTests(unittest.TestCase):
             (staged.parent.parent / ".powerpoint-render.retained").mkdir()
             return subprocess.CompletedProcess(command, 0, f"candidate\t1\t{pdf}\n", "")
         output = self.request_dir.resolve(strict=True) / "native-proof.json"
-        with mock.patch("capture_v5_powerpoint_render._run_adapter", side_effect=retained_stage) as runner, \
+        with mock.patch("capture_v5_powerpoint_render.sys.platform", "darwin"), \
+                mock.patch("capture_v5_powerpoint_render._run_adapter", side_effect=retained_stage) as runner, \
                 redirect_stdout(StringIO()), redirect_stderr(StringIO()):
             self.assertEqual(capture_main(["--root", str(self.source), "--candidate-dir", str(self.candidate),
                                            "--request", str(request_path),
