@@ -36,6 +36,7 @@ MAX_AUTHORED_BYTES = 8 * 1024 * 1024
 MAX_ASSIGNMENT_WORK = 2_000_000
 FRAME_TOLERANCE_PT = 0.5
 FONT_FLOAT_TOLERANCE_PT = 0.00001
+PAGE_TOLERANCE_PT = 0.01
 MAX_REQUEST_JSON = 12 * 1024 * 1024
 MAX_RESULT_BYTES = 2 * 1024 * 1024
 MAX_PARSER_FILES = 128
@@ -324,7 +325,7 @@ def extract_native_pdf(data: bytes) -> list[dict[str, object]]:
             page = document[index]
             try:
                 width, height = map(_number, page.get_size())
-                if abs(width - 960) > 0.01 or abs(height - 540) > 0.01 or page.get_rotation() != 0:
+                if abs(width - 960) > PAGE_TOLERANCE_PT or abs(height - 540) > PAGE_TOLERANCE_PT or page.get_rotation() != 0:
                     raise NativeTextError("native PDF canvas or rotation is unsupported")
                 text = page.get_textpage()
                 try:
@@ -380,7 +381,8 @@ def _text(value: object) -> str:
 
 def validate_native_page(page: dict[str, object], authored: list[dict[str, object]]) -> list[dict[str, object]]:
     """Validate measured glyphs against caller-bound immutable authored frames."""
-    if not isinstance(page, dict) or _number(page.get("width")) != 960 or _number(page.get("height")) != 540:
+    if (not isinstance(page, dict) or abs(_number(page.get("width")) - 960) > PAGE_TOLERANCE_PT
+            or abs(_number(page.get("height")) - 540) > PAGE_TOLERANCE_PT):
         raise NativeTextError("native canvas is invalid")
     chars = page.get("characters")
     if not isinstance(chars, list) or len(chars) > MAX_CHARACTERS:

@@ -85,6 +85,14 @@ class NativeExtractionTests(unittest.TestCase):
             with self.subTest(options=options), self.assertRaisesRegex(NativeTextError, "canvas or rotation"):
                 extract_native_pdf(native_pdf(**options))
 
+    def test_real_pdf_canvas_rounding_is_consistent_with_page_validation(self):
+        authored = [{"name": "title", "text": "Title", "singleLine": True, "bbox": [40, 40, 300, 80]}]
+        page = extract_native_pdf(native_pdf(canvas="960.009 539.991"))[0]
+        self.assertEqual(validate_native_page(page, authored)[0]["name"], "title")
+        for canvas in ("960.02 540", "960 539.98"):
+            with self.subTest(canvas=canvas), self.assertRaisesRegex(NativeTextError, "canvas or rotation"):
+                extract_native_pdf(native_pdf(canvas=canvas))
+
     def test_real_extraction_never_activates_form_callbacks(self):
         # Actual supported parser and ordinary/form-bearing PDFs. These guards
         # observe the specific interface named by CVE-2026-95338, not a mock
@@ -792,6 +800,10 @@ print(pypdfium2.MARKER)
         page, authored = fixture(); page["width"] = 1280
         with self.assertRaises(NativeTextError):
             validate_native_page(page, authored)
+        for key, value in (("width", 960.02), ("height", 539.98)):
+            page, authored = fixture(); page[key] = value
+            with self.subTest(key=key), self.assertRaisesRegex(NativeTextError, "canvas"):
+                validate_native_page(page, authored)
 
     def test_unicode_whitespace_is_not_silently_normalized(self):
         page, authored = fixture(); authored[0]["text"] += "\u00a0"
