@@ -95,6 +95,7 @@ def _run_adapter(command: list[str]) -> subprocess.CompletedProcess[str]:
 
 def capture(root: Path, candidate_dir: Path, request_path: Path, qa_input: Path,
             python_executable: Path, *, request_sha256: str,
+            qa_stage: Path | None = None,
             host_platform: str | None = None) -> dict[str, object]:
     """Return technical provenance only after the reviewed adapter succeeds."""
     if (host_platform or sys.platform) != "darwin" or os.name != "posix":
@@ -141,8 +142,20 @@ def capture(root: Path, candidate_dir: Path, request_path: Path, qa_input: Path,
         raise ValueError("native Python must be an executable regular file")
     python_sha256 = _sha(bounded_read(python, MAX_PYTHON_BYTES)[0])
     before_stages = {path.name for path in qa_root.glob(".powerpoint-render.*")}
+    persistent_stage: Path | None = None
+    if qa_stage is not None:
+        persistent_stage = _canonical_directory(qa_stage)
+        if (persistent_stage.parent != qa_root
+                or not re.fullmatch(r"\.powerpoint-render\.[A-Za-z0-9]{6}", persistent_stage.name)
+                or persistent_stage.stat().st_uid != os.getuid()
+                or (persistent_stage.stat().st_mode & 0o777) != 0o700
+                or any(persistent_stage.iterdir())):
+            raise ValueError("PowerPoint QA persistent stage must be an empty, owned private directory")
     command = ["/usr/bin/osascript", str(adapter), str(rendered), str(python),
-               str(stager), str(staged_input), request["candidate_pptx_sha256"]]
+               str(stager)]
+    if persistent_stage is not None:
+        command.extend(("--stage", str(persistent_stage)))
+    command.extend((str(staged_input), request["candidate_pptx_sha256"]))
     try:
         result = _run_adapter(command)
     except (OSError, UnicodeError, subprocess.TimeoutExpired) as exc:
@@ -158,6 +171,8 @@ def capture(root: Path, candidate_dir: Path, request_path: Path, qa_input: Path,
     if ({path.name for path in qa_root.glob(".powerpoint-render.*")}
             != before_stages):
         raise ValueError("native PowerPoint adapter retained a new private stage")
+    if persistent_stage is not None and any(persistent_stage.iterdir()):
+        raise ValueError("native PowerPoint adapter did not empty its persistent stage")
     if (_sha(bounded_read(staged_input, 64 * 1024 * 1024)[0]) != request["candidate_pptx_sha256"]
             or prepare(root, candidate_dir) != request
             or _private_request(request_path) != canonical_request
@@ -194,6 +209,8 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--request", type=Path, required=True)
     parser.add_argument("--request-sha256", required=True)
     parser.add_argument("--qa-input", type=Path, required=True)
+    parser.add_argument("--qa-stage", type=Path,
+                        help="existing empty private PowerPoint-QA stage approved for this run")
     parser.add_argument("--python", type=Path, required=True)
     parser.add_argument("--output", type=Path, required=True)
     args = parser.parse_args(argv)
@@ -205,7 +222,8 @@ def main(argv: list[str] | None = None) -> int:
         if output.exists() or output.is_symlink():
             raise ValueError("native provenance output already exists")
         receipt = capture(args.root, args.candidate_dir, args.request, args.qa_input,
-                          args.python, request_sha256=args.request_sha256)
+                          args.python, request_sha256=args.request_sha256,
+                          qa_stage=args.qa_stage)
         raw = (json.dumps(receipt, sort_keys=True, separators=(",", ":"),
                           ensure_ascii=True) + "\n").encode("ascii")
         with open_exclusive_write(output, mode=0o400) as stream:

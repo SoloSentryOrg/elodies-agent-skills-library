@@ -38,6 +38,10 @@ SKILL_DIR = _presentation_skill_dir()
 SETUP = SKILL_DIR / "container_tools" / "setup_artifact_tool_workspace.mjs"
 ARTIFACT_NODE_MODULES = Path(os.environ["CODEX_ARTIFACT_NODE_MODULES"]).expanduser().resolve() if os.environ.get("CODEX_ARTIFACT_NODE_MODULES") else None
 BUNDLED_ARTIFACT_AVAILABLE = ARTIFACT_NODE_MODULES is not None and (ARTIFACT_NODE_MODULES / "@oai" / "artifact-tool" / "package.json").is_file()
+BUNDLED_V5_RUNTIME = (
+    json.loads((ARTIFACT_NODE_MODULES / "@oai" / "artifact-tool" / "package.json").read_text(encoding="utf-8")).get("version") == "2.8.94"
+    if BUNDLED_ARTIFACT_AVAILABLE else False
+)
 def valid_model() -> dict[str, object]:
     references = [
         {
@@ -774,10 +778,11 @@ class AssessmentPptxTests(unittest.TestCase):
         self.assertFalse(output.exists())
 
     @unittest.skipUnless(shutil.which("node") and (SETUP.is_file() or BUNDLED_ARTIFACT_AVAILABLE), "bundled artifact runtime unavailable")
+    @unittest.skipIf(BUNDLED_V5_RUNTIME, "artifact-tool 2.8.94 uses the separately accepted native v5 output contract")
     def test_builds_editable_pptx_with_sources_and_renders(self) -> None:
         self._exercise_build()
 
-    @unittest.skipUnless(shutil.which("node") and BUNDLED_ARTIFACT_AVAILABLE and os.name == "posix", "bundled v5 candidate runtime unavailable")
+    @unittest.skipUnless(shutil.which("node") and BUNDLED_V5_RUNTIME and os.name == "posix", "supported bundled v5 candidate runtime unavailable")
     def test_builds_private_v5_candidate_without_normal_publication(self) -> None:
         self._exercise_build(candidate=True)
 

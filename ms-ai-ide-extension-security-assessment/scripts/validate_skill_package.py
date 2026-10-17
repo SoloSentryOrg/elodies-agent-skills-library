@@ -32,6 +32,7 @@ REQUIRED_PATHS = {
     "scripts/measure_v5_candidate.py",
     "scripts/capture_v5_powerpoint_render.py",
     "scripts/reconcile_v5_native_evidence.py",
+    "scripts/accept_v5_runtime.py",
     "scripts/test_native_pptx_text.py",
     "scripts/test_verify_v5_candidate.py",
     "scripts/test_stable_regular_file.mjs",

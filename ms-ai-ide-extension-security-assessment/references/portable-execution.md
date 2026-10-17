@@ -88,13 +88,22 @@ layout gate rejects missing, renamed, altered, duplicate or additional text,
 requires positive text bounds and line counts, and applies the 16-point minimum
 to all authored text. Single-line title requirements come from the authoring
 path. The retained v4-only gate remains fail-closed; the current v5 renderer
-lacks the former resolved font and line-count evidence. These source checks do
-not establish native rendering acceptance or update historical acceptance.
+lacks the former resolved font and line-count evidence. Structural checks alone
+do not establish native rendering acceptance or update historical acceptance.
 The private v5 measurement handoff in `scripts/measure_v5_candidate.py`
 re-verifies the current candidate and pending request, expected PDF and reviewed
 parser-policy hashes before calling the contained PDF worker. It re-reads the
 inputs afterward, writes only pending evidence into a private directory, and
-never replaces the production layout gate or the native/human closeout.
+cannot replace production output, native closeout or human acceptance by itself.
+For v5, `scripts/reconcile_v5_native_evidence.py` must first correlate the
+macOS PowerPoint render with a fresh contained measurement. The version-2
+private output from `scripts/finalize_v5_private_pptx.py` then retains the
+original staged inputs and candidate QA bindings. Only
+`scripts/accept_v5_runtime.py` may write the version-2 technical runtime
+receipt after re-executing that finalization and checking the output, source
+notes and package structure. This native v5 route is the supported alternative
+to v4's renderer-specific measured-layout receipt; it leaves publication and
+human/business/residual-risk acceptance pending.
 
 - `scripts/validate_assessment_pptx.py` rejects macros, ActiveX, embedded
   objects, review content, unsafe external relationships, and non-neutral
@@ -217,8 +226,16 @@ On macOS, stage the exact candidate as `PowerPoint-QA/input/candidate.pptx` in
 a new stable QA folder, with an empty `PowerPoint-QA/rendered` sibling. Run
 `scripts/capture_v5_powerpoint_render.py` with the candidate, its pending
 request and digest, the staged input, the bundled Python and a separate private
-(`0700`) output directory. This invokes the reviewed PowerPoint adapter once,
-requires its exact staged-document result, verifies the generated PDF and
+(`0700`) output directory. This invokes the reviewed PowerPoint adapter once.
+When macOS requires a folder-specific grant, create one empty, owned `0700`
+direct child named `.powerpoint-render.XXXXXX` under `PowerPoint-QA` and pass
+its exact path with `--qa-stage`. Grant only that exact folder in PowerPoint.
+The adapter retains the empty folder after a successful export so the granted
+identity can be reused; it refuses an occupied or symlinked stage and preserves
+uncertain document state for inspection. Never relabel a failed or earlier
+render as evidence for a changed candidate or source.
+
+The coordinator requires its exact staged-document result, verifies the generated PDF and
 records the adapter, stager and coordinator source digests. A failed adapter,
 unexpected document, changed input, or retained private stage issues no receipt.
 The `0400` record is technical render provenance only, with measurement and

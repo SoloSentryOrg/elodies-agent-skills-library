@@ -128,6 +128,33 @@ class CandidateTransportTests(unittest.TestCase):
         self.assertEqual(proof["human_acceptance"], "Pending")
         self.assertNotIn("Passed", json.dumps(proof))
 
+    def test_native_adapter_uses_only_the_explicit_private_stage(self) -> None:
+        request_path, staged, pdf, request = self._native_render_inputs()
+        stage = staged.parent.parent / ".powerpoint-render.pAwkau"
+        stage.mkdir(mode=0o700)
+
+        def render(command, **_kwargs):
+            self.assertEqual(command[-4:], ["--stage", str(stage), str(staged),
+                                            request["candidate_pptx_sha256"]])
+            pdf.write_bytes(b"%PDF-1.7\n" + b"synthetic native output" * 4)
+            return subprocess.CompletedProcess(command, 0, f"candidate\t1\t{pdf}\n", "")
+
+        with mock.patch("capture_v5_powerpoint_render._run_adapter", side_effect=render):
+            proof = capture(self.source, self.candidate, request_path, staged,
+                            Path(sys.executable).resolve(), qa_stage=stage,
+                            request_sha256=digest(encoded(request)), host_platform="darwin")
+        self.assertEqual(proof["candidate_pptx_sha256"], request["candidate_pptx_sha256"])
+        self.assertTrue(stage.is_dir())
+
+        pdf.unlink()
+        (stage / "unexpected").write_text("stale")
+        with mock.patch("capture_v5_powerpoint_render._run_adapter") as runner:
+            with self.assertRaisesRegex(ValueError, "empty, owned private"):
+                capture(self.source, self.candidate, request_path, staged,
+                        Path(sys.executable).resolve(), qa_stage=stage,
+                        request_sha256=digest(encoded(request)), host_platform="darwin")
+            runner.assert_not_called()
+
     def test_native_adapter_provenance_rejects_stale_or_unowned_output(self) -> None:
         request_path, staged, pdf, request = self._native_render_inputs()
         python = Path(sys.executable).resolve()

@@ -7,8 +7,8 @@
     },
     {
       "path": "pptx-runtime-acceptance.json",
-      "sha256": "a663067d238a2ab2f1a6d247a2f715743f4ccfaf36373144e055f7c6a60b06ff",
-      "size": 1324
+      "sha256": "e6a1e7f7932b27eb0b8467c5b2b0910bb3bf241336e2acd5a4f1dc5f8eb14ba0",
+      "size": 3690
     },
     {
       "path": "references/authoritative-report-standard.md",
@@ -42,13 +42,13 @@
     },
     {
       "path": "references/office-artifact-workflow.md",
-      "sha256": "05ef29e56b65b4d18c46f6783d183b5bfc484c6bab610000f4d3cd78fdb63bae",
-      "size": 8253
+      "sha256": "76f226be0e5fa822087ccfa312dd1ebf5d80e891c81372cf99560183ee6e3e49",
+      "size": 9025
     },
     {
       "path": "references/portable-execution.md",
-      "sha256": "355ad48727a2b184d6003703bca7ebe549da410b9508af65236262d7034a366c",
-      "size": 14460
+      "sha256": "699fcaa2eb182b4eea2f0e5d303a48c408c01a80bc715f8f6ca0c514414b2ce9",
+      "size": 15643
     },
     {
       "path": "references/prerequisites.md",
@@ -96,6 +96,11 @@
       "size": 1747
     },
     {
+      "path": "scripts/accept_v5_runtime.py",
+      "sha256": "211e11273c8af95b939d0d824136b8a56fc4c677225188012478aa19d14ea15a",
+      "size": 11838
+    },
+    {
       "path": "scripts/allowed-docx-custom-xml.json",
       "sha256": "a7da8940ae48880408f8aea858caabe1301938e2546df4451093990448b3577b",
       "size": 430
@@ -122,8 +127,8 @@
     },
     {
       "path": "scripts/capture_v5_powerpoint_render.py",
-      "sha256": "e43fd09e771b8ecc21db93eb128b05edf4bf5e0fd1d610c4885b9f881fb3e719",
-      "size": 11023
+      "sha256": "93b204f36c9b132dd435d585b76e2453f419c87c26ac14fe7470b6fdfd282f16",
+      "size": 12107
     },
     {
       "path": "scripts/create_artifact_runtime_receipt.mjs",
@@ -147,8 +152,8 @@
     },
     {
       "path": "scripts/finalize_v5_private_pptx.py",
-      "sha256": "046c7866b53330acd6398a335c6ef4f0f6a97e7d208c5fdf379a5d6f6a4312db",
-      "size": 7791
+      "sha256": "5d85eb168c3a21e9da2dc83c8f5db4ac225f122a795eae0282943983d554b83e",
+      "size": 10532
     },
     {
       "path": "scripts/initialize_stage_bundle.py",
@@ -187,8 +192,8 @@
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.applescript",
-      "sha256": "afeb633cfacf00a24aeb897295a923e05da1331523cb8fda869c74d02b90bdae",
-      "size": 11141
+      "sha256": "48493d8e591cac81fbaa1069eb5a428656352c224374fee5a6694d1cfd057485",
+      "size": 13666
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.ps1",
@@ -252,8 +257,8 @@
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
-      "sha256": "8e44fe80109a4dd1359874e1ecc1d416074800458cb9877c37cc2b5654038ffd",
-      "size": 56824
+      "sha256": "d08095aed484106b36aa5e1b6377d92263b67777b4b760947a843ee0e0deb055",
+      "size": 57155
     },
     {
       "path": "scripts/test_create_word_qa_contact_sheets.py",
@@ -312,8 +317,8 @@
     },
     {
       "path": "scripts/test_verify_v5_candidate.py",
-      "sha256": "fe75759e7ae22def27419e7583188991701a2c6c09a5d90a34b14ae7536d1541",
-      "size": 27023
+      "sha256": "c229d8f89cd7cb27093c3f51ec689eb1c73b4d01569d0167db985ff2f3f1109e",
+      "size": 28617
     },
     {
       "path": "scripts/validate_assessment_layout.py",
@@ -332,13 +337,13 @@
     },
     {
       "path": "scripts/validate_pptx_runtime_acceptance.py",
-      "sha256": "73499547a8c413a8db9387a1474bc585f2e671a5867aa6a247a5d0577829b7fa",
-      "size": 3228
+      "sha256": "6916bed2908505922a68360dc767eff90e0f2e3c9766c46bec2214c574906239",
+      "size": 6993
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "5b9a12c9f693c6c2280bbf95b4d56aaad87cf0888b8925ffc0fdc70e4bf82feb",
-      "size": 9281
+      "sha256": "29b8d7d984a73daaec9be7ecce1708a4af854636959565f8a7640be7d0f72972",
+      "size": 9317
     },
     {
       "path": "scripts/verify_v5_candidate.py",

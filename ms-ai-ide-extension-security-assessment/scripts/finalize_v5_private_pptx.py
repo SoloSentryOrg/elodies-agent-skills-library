@@ -76,6 +76,11 @@ def finalize(root: Path, candidate_dir: Path, request_path: Path, pdf_path: Path
     if saved != fresh:
         raise ValueError("technical reconciliation differs from fresh native evidence")
     request = prepare(root, candidate_dir)
+    candidate_bytes = _read(candidate_dir / "candidate.json", 8 * 1024 * 1024)
+    candidate = _json(candidate_bytes)
+    if (not isinstance(candidate, dict)
+            or _sha(candidate_bytes) != request["candidate_manifest_sha256"]):
+        raise ValueError("candidate manifest differs after native reconciliation")
     pptx = _read(candidate_dir / "candidate.pptx", MAX_FILE)
     if (_sha(pptx) != fresh["candidate_pptx_sha256"]
             or request["candidate_pptx_sha256"] != fresh["candidate_pptx_sha256"]):
@@ -102,6 +107,45 @@ def finalize(root: Path, candidate_dir: Path, request_path: Path, pdf_path: Path
         raise ValueError("candidate changed during private finalization")
     if _sha(_read(finalizer_source, 2 * 1024 * 1024)) != finalizer_sha256:
         raise ValueError("finalizer source changed during execution")
+    files = {item["file"]: item["sha256"] for item in candidate["files"]}
+    qa_names = {"deck.inspect.ndjson"}
+    for index in range(1, fresh["slide_count"] + 1):
+        qa_names.add(f"slide-{index:02d}.png")
+        qa_names.add(f"slide-{index:02d}.layout.json")
+    if not qa_names <= files.keys():
+        raise ValueError("private candidate lacks complete per-slide QA files")
+    qa_files = [{"file": name, "sha256": files[name]} for name in sorted(qa_names)]
+    build = {
+        "schema_version": 2,
+        "generator": "scripts/build_assessment_pptx.mjs+scripts/finalize_v5_private_pptx.py",
+        "runtime_versions": {
+            "node": candidate["runtime"]["node"],
+            "artifact_tool": candidate["runtime"]["artifact_tool"],
+        },
+        "artifact_runtime_receipt_sha256": candidate["runtime"]["artifact_runtime_receipt_sha256"],
+        "inputs": candidate["inputs"],
+        "candidate_manifest_sha256": fresh["candidate_manifest_sha256"],
+        "technical_reconciliation_sha256": _sha(reconciliation_bytes),
+        "finalizer_sha256": finalizer_sha256,
+        "output": {"file": output_path.name, "sha256": _sha(output_bytes),
+                   "slide_count": fresh["slide_count"]},
+        "qa_source": "immutable_candidate",
+        "qa_files": qa_files,
+        "native_pdf_sha256": fresh["native_pdf_sha256"],
+        "technical_validation": "Passed",
+        "native_powerpoint_closeout": "Verified",
+        "production_publication": "Pending",
+        "human_acceptance": "Pending",
+        "business_acceptance": "Pending",
+        "residual_risk_acceptance": "Pending",
+    }
+    build_raw = (json.dumps(build, sort_keys=True, separators=(",", ":"),
+                            ensure_ascii=True, allow_nan=False) + "\n").encode("ascii")
+    if len(build_raw) > 2 * 1024 * 1024:
+        raise ValueError("private build manifest exceeds bounds")
+    _write_private(directory / "assessment-build.json", build_raw)
+    if _read(directory / "assessment-build.json", 2 * 1024 * 1024) != build_raw:
+        raise ValueError("private build manifest changed")
     manifest = {
         "schema": "solosentry.pptx.v5-private-finalization/v1",
         "technical_validation": "Passed",
@@ -112,6 +156,7 @@ def finalize(root: Path, candidate_dir: Path, request_path: Path, pdf_path: Path
         "residual_risk_acceptance": "Pending",
         "candidate_manifest_sha256": fresh["candidate_manifest_sha256"],
         "technical_reconciliation_sha256": _sha(reconciliation_bytes),
+        "build_manifest_sha256": _sha(build_raw),
         "finalizer_sha256": finalizer_sha256,
         "native_pdf_sha256": fresh["native_pdf_sha256"],
         "output_sha256": _sha(output_bytes),
@@ -124,6 +169,10 @@ def finalize(root: Path, candidate_dir: Path, request_path: Path, pdf_path: Path
     _write_private(directory / "finalization.json", raw)
     if _sha(_read(directory / "finalization.json", 16 * 1024)) != _sha(raw):
         raise ValueError("private finalization manifest changed")
+    if (_sha(_read(finalizer_source, 2 * 1024 * 1024)) != finalizer_sha256
+            or _read(output_path, MAX_FILE) != pptx
+            or prepare(root, candidate_dir) != request):
+        raise ValueError("source, output or candidate changed after finalization")
     return manifest
 
 

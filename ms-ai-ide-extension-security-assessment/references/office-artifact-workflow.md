@@ -108,10 +108,21 @@ source.
    policy, trusted Python, reconciliation record and a new private output
    directory. It independently repeats reconciliation before copying the
    measured PPTX into that directory, then records the exact output digest and
-   technical source identity. This is a local technical handoff only:
+   technical source identity. The version-2 private `assessment-build.json`
+   binds the original staged inputs, runtime, candidate QA files and native
+   proof; those QA files remain in the immutable candidate directory. This is
+   a local technical handoff only:
    production publication and human, business and residual-risk acceptance
    remain `Pending`. Do not use its manifest as the repository's production
    runtime acceptance receipt or a substitute for licensed Windows Office QA.
+10. For the v5 technical runtime gate, run `scripts/accept_v5_runtime.py` on
+    the approved contained Linux host. It executes the private finalizer from
+    the same source-bound native evidence, checks the version-2 build manifest,
+    output identity, every slide's source notes and package structure, then
+    emits a source-bound receipt. Only that independently validated receipt may
+    satisfy the repository's technical PPTX runtime acceptance gate. It does
+    not publish an assessment, attest to human visual review or replace native
+    Windows Office execution.
 
 ## Spreadsheet and PDF routes
 
