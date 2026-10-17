@@ -44,6 +44,7 @@ REQUIRED_PATHS = {
     "scripts/portable_fs.py",
     "scripts/initialize_stage_bundle.py",
     "scripts/finalize_office_qa.py",
+    "scripts/finalize_v5_private_pptx.py",
     "scripts/render_presentations_with_powerpoint.applescript",
     "scripts/render_presentations_with_powerpoint.ps1",
     "scripts/render_reports_with_word.applescript",

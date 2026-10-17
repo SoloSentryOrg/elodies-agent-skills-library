@@ -102,6 +102,16 @@ source.
    business, and residual-risk acceptance remain `Pending` and require their
    separate gates. The reconciliation CLI's private-file contract is POSIX-only;
    Windows Office acceptance remains a separate native check.
+9. To prepare an exact private PowerPoint output, run
+   `scripts/finalize_v5_private_pptx.py` on the same approved Linux host with
+   the candidate, request, native PDF, render and measurement records, parser
+   policy, trusted Python, reconciliation record and a new private output
+   directory. It independently repeats reconciliation before copying the
+   measured PPTX into that directory, then records the exact output digest and
+   technical source identity. This is a local technical handoff only:
+   production publication and human, business and residual-risk acceptance
+   remain `Pending`. Do not use its manifest as the repository's production
+   runtime acceptance receipt or a substitute for licensed Windows Office QA.
 
 ## Spreadsheet and PDF routes
 

@@ -42,8 +42,8 @@
     },
     {
       "path": "references/office-artifact-workflow.md",
-      "sha256": "ff0a36a08c77fa0b15863adc938d32fa39263ce148e94094aa242f67787785c3",
-      "size": 7518
+      "sha256": "05ef29e56b65b4d18c46f6783d183b5bfc484c6bab610000f4d3cd78fdb63bae",
+      "size": 8253
     },
     {
       "path": "references/portable-execution.md",
@@ -144,6 +144,11 @@
       "path": "scripts/finalize_office_qa.py",
       "sha256": "62aced25d9a91236b114a9593bc90280a22024c014bf2419044377343a9f17d8",
       "size": 6368
+    },
+    {
+      "path": "scripts/finalize_v5_private_pptx.py",
+      "sha256": "046c7866b53330acd6398a335c6ef4f0f6a97e7d208c5fdf379a5d6f6a4312db",
+      "size": 7791
     },
     {
       "path": "scripts/initialize_stage_bundle.py",
@@ -332,8 +337,8 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "033f8366e07a35c73cfc7d431daa26e5cc3d7a51160d2b3f41d36df80ef25c87",
-      "size": 9238
+      "sha256": "5b9a12c9f693c6c2280bbf95b4d56aaad87cf0888b8925ffc0fdc70e4bf82feb",
+      "size": 9281
     },
     {
       "path": "scripts/verify_v5_candidate.py",
