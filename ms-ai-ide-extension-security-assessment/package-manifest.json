@@ -107,8 +107,8 @@
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "ce63a5d9f495af3d342517f374b440f1a7e56da7597f86866fa268c154452e09",
-      "size": 83391
+      "sha256": "b03b1a13284b86c317a8f0b1c15ef6b81def080a5ffe955b2c8315730f499e68",
+      "size": 83567
     },
     {
       "path": "scripts/build_release_archive.py",
@@ -237,8 +237,8 @@
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
-      "sha256": "1bd9b761dea2194d9f02bb407efd5b1ad39fa32d30bcb46296760720dc50453a",
-      "size": 55633
+      "sha256": "8e44fe80109a4dd1359874e1ecc1d416074800458cb9877c37cc2b5654038ffd",
+      "size": 56824
     },
     {
       "path": "scripts/test_create_word_qa_contact_sheets.py",

@@ -900,7 +900,22 @@ class AssessmentPptxTests(unittest.TestCase):
                 self.assertEqual((candidate_dir / item["file"]).stat().st_mode & 0o777, 0o400)
             self.assertEqual(payload["candidate_pptx_sha256"], hashlib.sha256((candidate_dir / "candidate.pptx").read_bytes()).hexdigest())
             authoring = json.loads((candidate_dir / "authoring.json").read_text())
+            self.assertEqual(payload["slide_count"], 9)
             self.assertEqual([x["slide"] for x in authoring["slides"]], list(range(1, payload["slide_count"] + 1)))
+            outcome_pages = [authoring["slides"][index]["authored"] for index in (1, 2)]
+            outcome_copy = [[frame for frame in page if frame["name"].startswith("outcome-copy-")]
+                            for page in outcome_pages]
+            self.assertEqual([[frame["text"] for frame in page] for page in outcome_copy],
+                             [model["executive_outcomes"][:4], model["executive_outcomes"][4:]])
+            self.assertTrue(all(frame["bbox"][3] == 100 for page in outcome_copy for frame in page))
+            self.assertIn("Remaining executive outcomes", [frame["text"] for frame in outcome_pages[1]])
+            with zipfile.ZipFile(candidate_dir / "candidate.pptx") as archive:
+                first_notes = archive.read("ppt/notesSlides/notesSlide2.xml").decode("utf-8")
+                remaining_notes = archive.read("ppt/notesSlides/notesSlide3.xml").decode("utf-8")
+                self.assertIn("REF-020", first_notes)
+                self.assertNotIn("REF-021", first_notes)
+                self.assertIn("REF-021", remaining_notes)
+                self.assertIn("REF-025", remaining_notes)
             for slide in authoring["slides"]:
                 self.assertTrue(slide["authored"])
                 layout = json.loads((candidate_dir / slide["layout"]).read_text())

@@ -719,20 +719,24 @@ function addCover(presentation, model) {
 }
 
 function addOutcomeSlides(presentation, model, startNumber) {
+  // Four taller rows preserve long conditions above the native 16pt floor.
+  const outcomesPerSlide = 4;
   const chunks = [];
-  for (let index = 0; index < model.executive_outcomes.length; index += 5) chunks.push(model.executive_outcomes.slice(index, index + 5));
+  for (let index = 0; index < model.executive_outcomes.length; index += outcomesPerSlide) {
+    chunks.push(model.executive_outcomes.slice(index, index + outcomesPerSlide));
+  }
   chunks.forEach((outcomes, chunkIndex) => {
     const number = startNumber + chunkIndex;
     const slide = presentation.slides.add();
     slide.background.fill = "#FFFFFF";
-    addTitle(slide, chunkIndex === 0 ? `Decision: ${model.decision}` : "The assessment's remaining executive outcomes", number, model);
+    addTitle(slide, chunkIndex === 0 ? `Decision: ${model.decision}` : "Remaining executive outcomes", number, model);
     addText(slide, `outcome-risk-${number}`, `Overall residual risk: ${model.overall_residual_risk}`, { left: 41, top: 132, width: 680, height: 48 }, 24, { bold: true, color: "#3D8DFF" });
     outcomes.forEach((outcome, index) => {
-      const top = 205 + index * 86;
-      addText(slide, `outcome-index-${number}-${index}`, String(chunkIndex * 5 + index + 1).padStart(2, "0"), { left: 41, top, width: 70, height: 46 }, 24, { bold: true, color: "#3D8DFF" });
-      addText(slide, `outcome-copy-${number}-${index}`, outcome, { left: 130, top, width: 1075, height: 74 }, 18);
+      const top = 205 + index * 110;
+      addText(slide, `outcome-index-${number}-${index}`, String(chunkIndex * outcomesPerSlide + index + 1).padStart(2, "0"), { left: 41, top, width: 70, height: 46 }, 24, { bold: true, color: "#3D8DFF" });
+      addText(slide, `outcome-copy-${number}-${index}`, outcome, { left: 130, top, width: 1075, height: 100 }, 18);
     });
-    setNotes(slide, model, model.derivative_sources.executive_outcomes.slice(chunkIndex * 5, chunkIndex * 5 + outcomes.length).flat());
+    setNotes(slide, model, model.derivative_sources.executive_outcomes.slice(chunkIndex * outcomesPerSlide, chunkIndex * outcomesPerSlide + outcomes.length).flat());
   });
   return chunks.length;
 }
