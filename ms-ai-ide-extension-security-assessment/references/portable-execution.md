@@ -73,6 +73,38 @@ distribution to force installation.
   `scripts/create_artifact_runtime_receipt.mjs` binds its package identity,
   version, entrypoint, and digests. Keep the prepared runtime workspace and its
   receipt outside the untrusted assessment workspace.
+The JavaScript receipt and builder share `scripts/stable_regular_file.mjs`.
+The receipt retains its 64 MiB per-file and 512 MiB total package bounds;
+the builder caps each file read at 512 MiB. Reads use a verified regular-file
+descriptor, reject growth or identity/metadata changes, and close the handle on
+failure. POSIX hosts require no-follow and nonblocking open flags so a replaced
+FIFO cannot wait for a writer. Windows checks the opened handle and leaf identity
+before reading; it does not claim POSIX no-follow flags or descriptor-relative
+ancestor protection. Keep runtime and output directories trusted on every host.
+
+The presentation builder binds every authored text box, including footers, to
+its exact name and text before asking the renderer for layout evidence. The
+layout gate rejects missing, renamed, altered, duplicate or additional text,
+requires positive text bounds and line counts, and applies the 16-point minimum
+to all authored text. Single-line title requirements come from the authoring
+path. The retained v4-only gate remains fail-closed; the current v5 renderer
+lacks the former resolved font and line-count evidence. Structural checks alone
+do not establish native rendering acceptance or update historical acceptance.
+The private v5 measurement handoff in `scripts/measure_v5_candidate.py`
+re-verifies the current candidate and pending request, expected PDF and reviewed
+parser-policy hashes before calling the contained PDF worker. It re-reads the
+inputs afterward, writes only pending evidence into a private directory, and
+cannot replace production output, native closeout or human acceptance by itself.
+For v5, `scripts/reconcile_v5_native_evidence.py` must first correlate the
+macOS PowerPoint render with a fresh contained measurement. The version-2
+private output from `scripts/finalize_v5_private_pptx.py` then retains the
+original staged inputs and candidate QA bindings. Only
+`scripts/accept_v5_runtime.py` may write the version-2 technical runtime
+receipt after re-executing that finalization and checking the output, source
+notes and package structure. This native v5 route is the supported alternative
+to v4's renderer-specific measured-layout receipt; it leaves publication and
+human/business/residual-risk acceptance pending.
+
 - `scripts/validate_assessment_pptx.py` rejects macros, ActiveX, embedded
   objects, review content, unsafe external relationships, and non-neutral
   author metadata before a generated deck is published.
@@ -84,7 +116,13 @@ distribution to force installation.
   accessibility checks, privacy checks, and the Word contents-page rule pass.
 - `scripts/render_reports_with_word.applescript` and
   `scripts/render_presentations_with_powerpoint.applescript` automate native
-  Office rendering on an authorized macOS host.
+  Office rendering on an authorized macOS host. The PowerPoint adapter resolves
+  the complete Office-reported path before matching its unique staged input;
+  basename matching is never sufficient. Its error handler closes only an
+  identified presentation. If Office has not exposed that identity (for example,
+  while awaiting file-access approval), the private stage is retained for
+  explicit operator cleanup. Per-event automation timeouts remain distinct from
+  the caller's overall process deadline and from native rendering acceptance.
 - `scripts/render_reports_with_word.ps1` and
   `scripts/render_presentations_with_powerpoint.ps1` provide the equivalent
   macro-disabled, read-only native Office QA adapters on an authorized Windows
@@ -132,3 +170,90 @@ junctions, and reparse-point ancestors, bind reads to the opened file identity,
 and use exclusive creation in trusted NTFS workspaces. A filesystem that cannot
 provide these semantics is unsupported and must be recorded as `Blocked` rather
 than silently weakened.
+
+## Native parser test evidence
+
+The hosted Linux and Windows regression jobs install the separate hash-locked
+`scripts/native-pdfium-tests.lock` with binary-only/no-dependency installation.
+This selects supported pypdfium2 5.14.0 wheels for those runners and macOS ARM64
+acceptance testing; it does not add a production parser dependency or establish
+production acceptance. Verbose tests distinguish actual parser executions from
+platform/prerequisite skips. The form-interface probe checks genuine ordinary
+and form-bearing PDFs and rejects unexpected form initialization/actions.
+
+CVE-2026-95338 maps through Chromium issue 556535630 to PDFium fix
+`4a36628222bb647c23b4ef3b8f3fc64e93e1dd3b` (8 September 2026), with stable
+backport `2358b16c1947eff67f0732754af6b3c4e1715ff9`. Fixed Chrome
+154.0.8037.57 pins that backport. Public PDFium chromium/8076 history includes
+the original fix; upstream 28 September builds and signed 29 September archives
+match all three selected wheel native binaries. The upstream attestation binds
+the binary-builder source, not an immutable resolved PDFium checkout SHA; keep
+that qualification. Source and runtime form-interface evidence concern this
+extractor's usage, not absence of all PDFium vulnerabilities. Production pipeline,
+source-bound runtime acceptance and licensed native Windows Office remain gates.
+
+Primary sources: [PDFium fix](https://pdfium.googlesource.com/pdfium/+/4a36628222bb647c23b4ef3b8f3fc64e93e1dd3b),
+[fixed Chrome dependency pin](https://chromium.googlesource.com/chromium/src/+/refs/tags/154.0.8037.57/DEPS),
+[upstream native build](https://github.com/bblanchon/pdfium-binaries/actions/runs/36410865276/attempts/2),
+[pypdfium2 release](https://github.com/pypdfium2-team/pypdfium2/releases/tag/5.14.0).
+
+
+## Private v5 PowerPoint candidates
+
+Use the explicit `--v5-candidate-dir NEW_DIRECTORY` builder mode only to prepare
+private, editable candidates for native measurement. Supply the existing bound
+assessment/Word inputs, artifact workspace/runtime receipt, receipt-bound montage
+helper and Python runtime. Do not supply normal `--output`, `--build-manifest`,
+`--qa-dir` or `--validate-only` arguments with this mode.
+
+The directory must be new and inside the declared workspace. POSIX permissions
+are created and checked as `0700`; contained evidence files use `0400`. Native
+Windows private-directory ACL assurance is not established by this mode, so
+candidate staging on Windows remains unsupported. Licensed Windows Office
+adapter acceptance remains a separate requirement.
+
+Candidate mode requests the documented full v5 layout export and runs the full
+structural/authoring validator. It retains ordered authored frames, complete v5
+layouts, editable PPTX, runtime receipt, input bindings and current source hashes.
+The manifest is `solosentry.pptx.v5-candidate/v1`, with status **Pending native
+measurement** and native Office/human acceptance **Pending**. It does not produce
+a normal output build manifest or any production acceptance receipt. Structural
+geometry, nominal font values and candidate PNG previews do not prove rendered
+font size, wrapping, visual quality or acceptance.
+
+The normal builder retains its v4 measured-layout gate and refuses v5 evidence.
+On macOS, stage the exact candidate as `PowerPoint-QA/input/candidate.pptx` in
+a new stable QA folder, with an empty `PowerPoint-QA/rendered` sibling. Run
+`scripts/capture_v5_powerpoint_render.py` with the candidate, its pending
+request and digest, the staged input, the bundled Python and a separate private
+(`0700`) output directory. This invokes the reviewed PowerPoint adapter once.
+When macOS requires a folder-specific grant, create one empty, owned `0700`
+direct child named `.powerpoint-render.XXXXXX` under `PowerPoint-QA` and pass
+its exact path with `--qa-stage`. Grant only that exact folder in PowerPoint.
+The adapter retains the empty folder after a successful export so the granted
+identity can be reused; it refuses an occupied or symlinked stage and preserves
+uncertain document state for inspection. Never relabel a failed or earlier
+render as evidence for a changed candidate or source.
+
+The coordinator requires its exact staged-document result, verifies the generated PDF and
+records the adapter, stager and coordinator source digests. A failed adapter,
+unexpected document, changed input, or retained private stage issues no receipt.
+The `0400` record is technical render provenance only, with measurement and
+human acceptance pending. Use the resulting PDF digest as an input to the
+contained Linux/Windows measurement coordinator; never infer acceptance from
+the render record alone.
+
+On the same approved contained Linux parser host, reconcile the exact private render
+record and measurement record with `scripts/reconcile_v5_native_evidence.py`.
+The coordinator reruns the PDF measurement against the current candidate and
+refuses mismatched identities, altered evidence or incomplete Office closeout.
+Its private `0400` output records a technical pass while production publication
+and human, business and residual-risk acceptance remain pending. Do not copy
+the candidate to a production destination on the strength of this record alone.
+The reconciliation CLI currently requires POSIX private-file semantics; native
+Windows Office evidence remains a separate requirement.
+
+The normal builder retains its v4 measured-layout gate and refuses v5 evidence.
+A reviewed production finalizer must correlate the native render record and
+contained PDF measurements with these exact candidate identities, then
+preserve source-bound runtime and human acceptance gates before promotion.

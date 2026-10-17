@@ -26,6 +26,11 @@ jobs:
           fetch-depth: 0
           persist-credentials: false
 
+      - name: Set up Python 3.12
+        uses: actions/setup-python@5fda3b95a4ea91299a34e894583c3862153e4b97 # v7.0.0
+        with:
+          python-version: '3.12'
+
       - name: Validate repository and skills
         run: ruby scripts/validate_repository.rb
 
@@ -35,18 +40,44 @@ jobs:
           --only-binary=:all: --require-hashes
           -r ms-ai-ide-extension-security-assessment/scripts/requirements.lock
 
+      - name: Install hash-locked native parser for acceptance tests
+        run: >-
+          python3 -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes --no-deps
+          -r ms-ai-ide-extension-security-assessment/scripts/native-pdfium-tests.lock
+
+      - name: Verify isolated native parser test installation
+        run: >-
+          python3 -I -c "import hashlib,importlib.machinery,importlib.metadata,json,pathlib,stat,sys;
+          assert sys.flags.isolated and sys.flags.no_user_site;
+          assert importlib.metadata.version('pypdfium2') == '5.14.0';
+          specs=[importlib.machinery.PathFinder.find_spec(n,sys.path) for n in ('pypdfium2','pypdfium2_raw')];
+          assert all(x and x.origin and x.submodule_search_locations for x in specs);
+          root=pathlib.Path(specs[1].origin).parent;
+          version_bytes=(root/'version.json').open('rb').read(65537);
+          assert len(version_bytes) <= 65536;
+          version=json.loads(version_bytes);
+          assert [version[k] for k in ('major','minor','build','patch')] == [156,0,8076,0];
+          binary=root/'libpdfium.so';
+          assert stat.S_ISREG(binary.lstat().st_mode);
+          data=binary.open('rb').read(33554433);
+          assert 0 < len(data) <= 33554432;
+          assert hashlib.sha256(data).hexdigest() == 'fd4de9f91f183476d04b1bc3fd17dacd95aba349c55d2c376512d95e082b441e';
+          assert not any(n == 'pypdfium2' or n.startswith(('pypdfium2.','pypdfium2_raw')) for n in sys.modules);
+          print('Isolated hash-locked Linux parser discovery passed; no native parser imported')"
+
       - name: Validate portable skill package
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
           python3 ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py
-          --expected-version 1.4.6
+          --expected-version 1.4.7
 
       - name: Run portable skill regression tests
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
-          python3 -m unittest discover
+          python3 -m unittest discover -v
           -s ms-ai-ide-extension-security-assessment/scripts
           -p 'test_*.py'
 
@@ -99,18 +130,24 @@ jobs:
           --only-binary=:all: --require-hashes
           -r ms-ai-ide-extension-security-assessment/scripts/requirements.lock
 
+      - name: Install hash-locked native parser for acceptance tests
+        run: >-
+          python -m pip install --disable-pip-version-check --no-input
+          --only-binary=:all: --require-hashes --no-deps
+          -r ms-ai-ide-extension-security-assessment/scripts/native-pdfium-tests.lock
+
       - name: Validate complete portable package
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
           python ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py
-          --expected-version 1.4.6
+          --expected-version 1.4.7
 
       - name: Run portable regression tests on Windows
         env:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
-          python -m unittest discover
+          python -m unittest discover -v
           -s ms-ai-ide-extension-security-assessment/scripts
           -p 'test_*.py'
 

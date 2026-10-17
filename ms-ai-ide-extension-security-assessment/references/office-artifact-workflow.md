@@ -71,6 +71,58 @@ source.
 5. Render every slide, inspect each at full size, and resolve all overflow,
    unintended overlap, clipping, wrapping, placeholder, connector, and source
    defects. Perform final format-sensitive inspection in installed PowerPoint.
+6. For a private v5 candidate, run `scripts/verify_v5_candidate.py` with
+   `--candidate-dir` and `--output` in separate private (`0700`) directories.
+   Transfer its source-bound, read-only request and candidate to the approved
+   native host without publishing either. The request remains `Pending native
+   rendering`: it is not a native measurement, visual review, acceptance
+   receipt, or permission to release the presentation.
+   On macOS, `scripts/capture_v5_powerpoint_render.py` runs the existing
+   PowerPoint adapter against an exact staged candidate and writes a private
+   source-bound render record only after the adapter reports the expected
+   document, slide count and PDF. Keep this technical provenance separate from
+   contained PDF measurements and human acceptance.
+7. After separately verifying that PowerPoint rendered the exact staged PPTX,
+   transfer the private PDF to an approved Linux parser runner. Run
+   `scripts/measure_v5_candidate.py` with the current candidate, pending
+   request, their expected SHA-256 identities, the reviewed parser-policy file
+   and its SHA-256, an explicit trusted Python, and the expected PDF SHA-256.
+   It rechecks source and file identities, invokes the bounded native parser,
+   and writes only a private read-only record marked `Pending native provenance
+   and acceptance`. Keep the PowerPoint execution proof, every-slide visual
+   review, and human acceptance separate; this measurement is not a `Passed`
+   runtime receipt or authority to publish.
+8. On the approved contained Linux parser host, run
+   `scripts/reconcile_v5_native_evidence.py` with the exact candidate, request,
+   PDF, native render record, measurement record, parser policy, trusted Python,
+   and expected digests. It reruns the bounded parser and requires the stored
+   measurement to match the fresh result before writing a private technical
+   reconciliation record. Its `technical_validation: Passed` applies only to
+   the correlated render and measurement. Production publication, human visual,
+   business, and residual-risk acceptance remain `Pending` and require their
+   separate gates. The reconciliation CLI's private-file contract is POSIX-only;
+   Windows Office acceptance remains a separate native check.
+9. To prepare an exact private PowerPoint output, run
+   `scripts/finalize_v5_private_pptx.py` on the same approved Linux host with
+   the candidate, request, native PDF, render and measurement records, parser
+   policy, trusted Python, reconciliation record and a new private output
+   directory. It independently repeats reconciliation before copying the
+   measured PPTX into that directory, then records the exact output digest and
+   technical source identity. The version-2 private `assessment-build.json`
+   binds the original staged inputs, runtime, candidate QA files and native
+   proof; those QA files remain in the immutable candidate directory. This is
+   a local technical handoff only:
+   production publication and human, business and residual-risk acceptance
+   remain `Pending`. Do not use its manifest as the repository's production
+   runtime acceptance receipt or a substitute for licensed Windows Office QA.
+10. For the v5 technical runtime gate, run `scripts/accept_v5_runtime.py` on
+    the approved contained Linux host. It executes the private finalizer from
+    the same source-bound native evidence, checks the version-2 build manifest,
+    output identity, every slide's source notes and package structure, then
+    emits a source-bound receipt. Only that independently validated receipt may
+    satisfy the repository's technical PPTX runtime acceptance gate. It does
+    not publish an assessment, attest to human visual review or replace native
+    Windows Office execution.
 
 ## Spreadsheet and PDF routes
 

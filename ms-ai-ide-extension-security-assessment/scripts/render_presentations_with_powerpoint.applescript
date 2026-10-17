@@ -70,7 +70,31 @@ on createTaskDirectory(qaRoot)
     return taskDirectory
 end createTaskDirectory
 
-on cleanupTaskDirectory(taskDirectory, qaRoot)
+on usePersistentTaskDirectory(taskDirectory, qaRoot)
+    if taskDirectory does not start with "/" then error "PowerPoint QA persistent stage must be absolute"
+    if (do shell script "/usr/bin/dirname " & quoted form of taskDirectory) is not qaRoot then
+        error "PowerPoint QA persistent stage must be directly inside its QA root"
+    end if
+    set stageName to do shell script "/usr/bin/basename " & quoted form of taskDirectory
+    try
+        do shell script "/usr/bin/printf %s " & quoted form of stageName & " | /usr/bin/grep -Eq '^\\.powerpoint-render\\.[A-Za-z0-9]{6}$'"
+        do shell script "/bin/test -d " & quoted form of taskDirectory & " -a ! -L " & quoted form of taskDirectory
+    on error
+        error "PowerPoint QA persistent stage is not a recognised real directory"
+    end try
+    if (do shell script "/bin/realpath " & quoted form of taskDirectory) is not taskDirectory then
+        error "PowerPoint QA persistent stage is not canonical"
+    end if
+    if (do shell script "/usr/bin/stat -f %Lp " & quoted form of taskDirectory) is not "700" then
+        error "PowerPoint QA persistent stage must be private"
+    end if
+    if (do shell script "/bin/ls -A " & quoted form of taskDirectory) is not "" then
+        error "PowerPoint QA persistent stage is occupied"
+    end if
+    return taskDirectory
+end usePersistentTaskDirectory
+
+on cleanupTaskDirectory(taskDirectory, qaRoot, persistentStage)
     if taskDirectory is missing value then return
     if (do shell script "/usr/bin/dirname " & quoted form of taskDirectory) is not qaRoot then
         error "Refusing to clean a PowerPoint QA task directory outside its QA root: " & taskDirectory
@@ -78,7 +102,15 @@ on cleanupTaskDirectory(taskDirectory, qaRoot)
     if (do shell script "/usr/bin/basename " & quoted form of taskDirectory) does not start with ".powerpoint-render." then
         error "Refusing to clean an unrecognised PowerPoint QA task directory: " & taskDirectory
     end if
-    do shell script "/bin/rm -rf " & quoted form of taskDirectory
+    if persistentStage then
+        -- Keep the exact approved directory identity; remove only task-owned files.
+        do shell script "/bin/rm -f " & quoted form of (taskDirectory & "/input.pptx") & space & quoted form of (taskDirectory & "/output.pdf")
+        if (do shell script "/bin/ls -A " & quoted form of taskDirectory) is not "" then
+            error "PowerPoint QA persistent stage contains unexpected files"
+        end if
+    else
+        do shell script "/bin/rm -rf " & quoted form of taskDirectory
+    end if
 end cleanupTaskDirectory
 
 on stagePresentation(inputPath, expectedHash, taskDirectory, pythonPath, stagerPath)
@@ -99,9 +131,33 @@ on publishOutput(temporaryOutput, outputPath)
     end if
 end publishOutput
 
+on canonicalOfficePath(nativeFullName)
+    try
+        -- Office may report HFS paths or a /tmp alias for a /private/tmp file.
+        -- Resolve the full file identity; never select a document by basename.
+        if nativeFullName starts with "/" then
+            set nativePath to POSIX path of ((POSIX file nativeFullName) as alias)
+        else
+            set nativePath to POSIX path of (nativeFullName as alias)
+        end if
+        return do shell script "/bin/realpath " & quoted form of nativePath
+    on error
+        return ""
+    end try
+end canonicalOfficePath
+
 on run argv
-    if (count of argv) is less than 5 or ((count of argv) - 3) mod 2 is not 0 then
-        error "usage: render_presentations_with_powerpoint.applescript OUTPUT_DIR PYTHON STAGER PRESENTATION.pptx SHA256 [...]"
+    set persistentStage to false
+    set firstPresentationArgument to 4
+    if (count of argv) > 3 then
+        if item 4 of argv is "--stage" then
+            set persistentStage to true
+            set firstPresentationArgument to 6
+            if (count of argv) is not 7 then error "PowerPoint QA persistent stage accepts exactly one presentation"
+        end if
+    end if
+    if (count of argv) is less than (firstPresentationArgument + 1) or ((count of argv) - firstPresentationArgument + 1) mod 2 is not 0 then
+        error "usage: render_presentations_with_powerpoint.applescript OUTPUT_DIR PYTHON STAGER [--stage PRIVATE_DIR] PRESENTATION.pptx SHA256 [...]"
     end if
     set qaFolders to canonicalQAFolders(item 1 of argv)
     set outputFolder to item 1 of qaFolders
@@ -111,7 +167,7 @@ on run argv
     set stagerPath to item 3 of argv
     do shell script "/bin/test -f " & quoted form of pythonPath & " -a ! -L " & quoted form of pythonPath & " -a -f " & quoted form of stagerPath & " -a ! -L " & quoted form of stagerPath
     set renderedPresentations to {}
-    repeat with argumentNumber from 4 to count of argv by 2
+    repeat with argumentNumber from firstPresentationArgument to count of argv by 2
         set inputPath to validatePresentationPath(item argumentNumber of argv, inputFolder)
         set expectedHash to item (argumentNumber + 1) of argv
         try
@@ -129,39 +185,59 @@ on run argv
         set taskDirectory to missing value
         set my openedPresentation to missing value
         try
-            set taskDirectory to createTaskDirectory(qaRoot)
+            if persistentStage then
+                set taskDirectory to usePersistentTaskDirectory(item 5 of argv, qaRoot)
+            else
+                set taskDirectory to createTaskDirectory(qaRoot)
+            end if
             set stagedPath to stagePresentation(inputPath, expectedHash, taskDirectory, pythonPath, stagerPath)
             set temporaryOutput to taskDirectory & "/output.pdf"
             set stagedFile to POSIX file stagedPath
+            with timeout of 60 seconds
             tell application "Microsoft PowerPoint"
                 open stagedFile
                 set currentPresentations to every presentation
                 repeat with candidatePresentation in currentPresentations
-                    if (full name of candidatePresentation as text) is stagedPath then
+                    set candidatePath to my canonicalOfficePath(full name of candidatePresentation as text)
+                    if candidatePath is stagedPath then
                         set my openedPresentation to candidatePresentation
                         exit repeat
                     end if
                 end repeat
                 if my openedPresentation is missing value then error "PowerPoint did not expose the unique staged QA presentation"
+                if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity changed before export"
                 set presentationSlides to count slides of (my openedPresentation)
                 save my openedPresentation in POSIX file temporaryOutput as save as PDF
                 do shell script "/bin/test -s " & quoted form of temporaryOutput
+                if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity changed before close"
                 close my openedPresentation saving no
                 set my openedPresentation to missing value
             end tell
+            end timeout
             publishOutput(temporaryOutput, outputPath)
-            cleanupTaskDirectory(taskDirectory, qaRoot)
+            cleanupTaskDirectory(taskDirectory, qaRoot, persistentStage)
             set taskDirectory to missing value
             set end of renderedPresentations to presentationStem & tab & (presentationSlides as text) & tab & outputPath
         on error errorMessage number errorNumber
-            tell application "Microsoft PowerPoint"
+            if my openedPresentation is not missing value then
                 try
-                    close my openedPresentation saving no
+                    with timeout of 10 seconds
+                        tell application "Microsoft PowerPoint"
+                            if my canonicalOfficePath(full name of (my openedPresentation) as text) is not stagedPath then error "PowerPoint identity unavailable or changed; retaining private stage"
+                            close my openedPresentation saving no
+                        end tell
+                    end timeout
+                    set my openedPresentation to missing value
+                    cleanupTaskDirectory(taskDirectory, qaRoot, persistentStage)
+                    set taskDirectory to missing value
                 end try
-            end tell
-            try
-                cleanupTaskDirectory(taskDirectory, qaRoot)
-            end try
+            end if
+            -- If Office never exposed the staged identity, a file-access prompt
+            -- may still reference it. Retain this private task directory for
+            -- explicit operator cleanup rather than deleting a pending input.
+            if taskDirectory is not missing value then
+                set errorMessage to errorMessage & "; private QA stage retained at " & taskDirectory
+            end if
             error "PowerPoint render failed for " & inputPath & ": " & errorMessage number errorNumber
         end try
     end repeat

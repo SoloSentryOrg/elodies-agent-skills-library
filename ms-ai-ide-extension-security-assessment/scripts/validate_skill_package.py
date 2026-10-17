@@ -27,6 +27,16 @@ REQUIRED_PATHS = {
     "scripts/build_assessment_pptx.mjs",
     "scripts/build_release_archive.py",
     "scripts/create_artifact_runtime_receipt.mjs",
+    "scripts/stable_regular_file.mjs",
+    "scripts/native_pptx_text.py",
+    "scripts/measure_v5_candidate.py",
+    "scripts/capture_v5_powerpoint_render.py",
+    "scripts/reconcile_v5_native_evidence.py",
+    "scripts/accept_v5_runtime.py",
+    "scripts/test_native_pptx_text.py",
+    "scripts/test_verify_v5_candidate.py",
+    "scripts/test_stable_regular_file.mjs",
+    "scripts/test_stable_regular_file.py",
     "scripts/create_pptx_montage.py",
     "scripts/allowed-docx-custom-xml.json",
     "scripts/build_release_manifest.py",
@@ -35,6 +45,7 @@ REQUIRED_PATHS = {
     "scripts/portable_fs.py",
     "scripts/initialize_stage_bundle.py",
     "scripts/finalize_office_qa.py",
+    "scripts/finalize_v5_private_pptx.py",
     "scripts/render_presentations_with_powerpoint.applescript",
     "scripts/render_presentations_with_powerpoint.ps1",
     "scripts/render_reports_with_word.applescript",
@@ -59,6 +70,7 @@ REQUIRED_PATHS = {
     "scripts/validate_assessment_pptx.py",
     "scripts/validate_assessment_report.py",
     "scripts/validate_pptx_runtime_acceptance.py",
+    "scripts/verify_v5_candidate.py",
     "scripts/validate_skill_package.py",
     "schemas/report-model.schema.json",
     "schemas/stage-manifest.schema.json",
@@ -68,7 +80,7 @@ REQUIRED_PATHS = {
 }
 MANIFEST_NAME = "package-manifest.json"
 SOURCE_REPOSITORY = "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
-SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.6"
+SOURCE_REF = "ms-ai-ide-extension-security-assessment-v1.4.7"
 MAX_FILE_BYTES = 16 * 1024 * 1024
 
 
