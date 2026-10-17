@@ -6,6 +6,8 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import subprocess
+import sys
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -13,6 +15,8 @@ from io import StringIO
 from pathlib import Path
 from unittest import mock
 
+from capture_v5_powerpoint_render import MAX_ADAPTER_OUTPUT, _run_adapter, capture
+from capture_v5_powerpoint_render import main as capture_main
 from measure_v5_candidate import main as measure_main
 from measure_v5_candidate import measure
 from validate_pptx_runtime_acceptance import BOUND_FILES
@@ -82,6 +86,87 @@ class CandidateTransportTests(unittest.TestCase):
                       for name, data in sorted(self.files.items())],
         }
         (self.candidate / "candidate.json").write_bytes(encoded(manifest))
+
+    def test_native_adapter_output_has_live_byte_bound(self) -> None:
+        command = [sys.executable, "-c", f"import sys; sys.stdout.write('x'*{MAX_ADAPTER_OUTPUT + 1})"]
+        with self.assertRaisesRegex(ValueError, "exceeds bounds"):
+            _run_adapter(command)
+        small = _run_adapter([sys.executable, "-c", "import sys; print('ok'); print('note', file=sys.stderr)"])
+        self.assertEqual((small.returncode, small.stdout, small.stderr), (0, "ok\n", "note\n"))
+
+    def _native_render_inputs(self) -> tuple[Path, Path, Path, dict[str, object]]:
+        request = prepare(self.source, self.candidate)
+        request_path = self.request_dir / "native-request.json"
+        request_path.write_bytes(encoded(request))
+        qa_root = self.root / "PowerPoint-QA"
+        (qa_root / "input").mkdir(parents=True)
+        (qa_root / "rendered").mkdir()
+        qa_root = qa_root.resolve(strict=True)
+        staged = qa_root / "input" / "candidate.pptx"
+        staged.write_bytes(self.files["candidate.pptx"])
+        (self.source / "scripts/capture_v5_powerpoint_render.py").write_bytes(b"reviewed synthetic coordinator\n")
+        return request_path, staged, qa_root / "rendered" / "candidate-powerpoint-full.pdf", request
+
+    def test_native_adapter_provenance_binds_exact_candidate_without_acceptance(self) -> None:
+        request_path, staged, pdf, request = self._native_render_inputs()
+        def render(command, **_kwargs):
+            self.assertEqual(command[0], "/usr/bin/osascript")
+            self.assertEqual(command[-2:], [str(staged), request["candidate_pptx_sha256"]])
+            pdf.write_bytes(b"%PDF-1.7\n" + b"synthetic native output" * 4)
+            return subprocess.CompletedProcess(command, 0, f"candidate\t1\t{pdf}\n", "")
+        with mock.patch("capture_v5_powerpoint_render._run_adapter", side_effect=render) as runner:
+            proof = capture(self.source, self.candidate, request_path, staged,
+                            Path(sys.executable).resolve(),
+                            request_sha256=digest(encoded(request)), host_platform="darwin")
+        runner.assert_called_once()
+        self.assertEqual(proof["schema"], "solosentry.pptx.v5-native-render/v1")
+        self.assertEqual(proof["candidate_pptx_sha256"], digest(self.files["candidate.pptx"]))
+        self.assertEqual(proof["native_pdf_sha256"], digest(pdf.read_bytes()))
+        self.assertRegex(proof["native_python_sha256"], r"^[0-9a-f]{64}$")
+        self.assertEqual(proof["human_acceptance"], "Pending")
+        self.assertNotIn("Passed", json.dumps(proof))
+
+    def test_native_adapter_provenance_rejects_stale_or_unowned_output(self) -> None:
+        request_path, staged, pdf, request = self._native_render_inputs()
+        python = Path(sys.executable).resolve()
+        with mock.patch("capture_v5_powerpoint_render._run_adapter") as runner:
+            with self.assertRaisesRegex(ValueError, "request differs"):
+                capture(self.source, self.candidate, request_path, staged, python,
+                        request_sha256="0" * 64, host_platform="darwin")
+            runner.assert_not_called()
+        staged.unlink()
+        staged.symlink_to(self.candidate / "candidate.pptx")
+        with mock.patch("capture_v5_powerpoint_render._run_adapter") as runner:
+            with self.assertRaises((OSError, ValueError)):
+                capture(self.source, self.candidate, request_path, staged, python,
+                        request_sha256=digest(encoded(request)), host_platform="darwin")
+            runner.assert_not_called()
+        staged.unlink()
+        staged.write_bytes(self.files["candidate.pptx"])
+        def wrong_document(command, **_kwargs):
+            pdf.write_bytes(b"%PDF-1.7\n" + b"synthetic native output" * 4)
+            return subprocess.CompletedProcess(command, 0, f"unrelated\t1\t{pdf}\n", "")
+        with (mock.patch("capture_v5_powerpoint_render._run_adapter", side_effect=wrong_document),
+              self.assertRaisesRegex(ValueError, "unexpected export")):
+            capture(self.source, self.candidate, request_path, staged, python,
+                    request_sha256=digest(encoded(request)), host_platform="darwin")
+
+    def test_native_adapter_provenance_rejects_retained_stage_without_receipt(self) -> None:
+        request_path, staged, pdf, request = self._native_render_inputs()
+        def retained_stage(command, **_kwargs):
+            pdf.write_bytes(b"%PDF-1.7\n" + b"synthetic native output" * 4)
+            (staged.parent.parent / ".powerpoint-render.retained").mkdir()
+            return subprocess.CompletedProcess(command, 0, f"candidate\t1\t{pdf}\n", "")
+        output = self.request_dir.resolve(strict=True) / "native-proof.json"
+        with mock.patch("capture_v5_powerpoint_render._run_adapter", side_effect=retained_stage) as runner, \
+                redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            self.assertEqual(capture_main(["--root", str(self.source), "--candidate-dir", str(self.candidate),
+                                           "--request", str(request_path),
+                                           "--request-sha256", digest(encoded(request)),
+                                           "--qa-input", str(staged), "--python", str(Path(sys.executable).resolve()),
+                                           "--output", str(output)]), 1)
+        runner.assert_called_once()
+        self.assertFalse(output.exists())
 
     def test_pending_request_binds_sources_and_never_claims_acceptance(self) -> None:
         request = prepare(self.source, self.candidate)

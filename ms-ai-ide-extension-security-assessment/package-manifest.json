@@ -42,13 +42,13 @@
     },
     {
       "path": "references/office-artifact-workflow.md",
-      "sha256": "26cef1d694c1b2cfbd7fbfac159b38c8f83fb042ce1da47e5036b4108f218e26",
-      "size": 6419
+      "sha256": "05141e7a2c10f0b0150bba9518da5a73dfc4f114242e81163a32d81b9e82e4eb",
+      "size": 6774
     },
     {
       "path": "references/portable-execution.md",
-      "sha256": "3b66eaf2b3919661563097fc29fb99a11cdf2668ce8969d0eaa52b080b187920",
-      "size": 12876
+      "sha256": "2583e7a25674dbd70c3806eaaf8bf9ce8ac63573d3e91238e08b53a4ed671d22",
+      "size": 13768
     },
     {
       "path": "references/prerequisites.md",
@@ -119,6 +119,11 @@
       "path": "scripts/build_release_manifest.py",
       "sha256": "506ebd1ae59c805f21e33678f53c8c496f86307a466377c207de86b0c3668a8f",
       "size": 9800
+    },
+    {
+      "path": "scripts/capture_v5_powerpoint_render.py",
+      "sha256": "e43fd09e771b8ecc21db93eb128b05edf4bf5e0fd1d610c4885b9f881fb3e719",
+      "size": 11023
     },
     {
       "path": "scripts/create_artifact_runtime_receipt.mjs",
@@ -297,8 +302,8 @@
     },
     {
       "path": "scripts/test_verify_v5_candidate.py",
-      "sha256": "bb9a41d8f4aaa28e8cbefe8b11bcd4920a42d8a20ade52f35f3288673712ebf3",
-      "size": 14633
+      "sha256": "40374bd7ba731d5b60647d929b99b2c75e72a5e0eba42d188ec93b4fcee2d8fa",
+      "size": 20279
     },
     {
       "path": "scripts/validate_assessment_layout.py",
@@ -322,8 +327,8 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "a1cd35dc6a1cd283716548a05fd2bd8084ac751c6e1db18c11ef7382bb398e8e",
-      "size": 9063
+      "sha256": "01903ee562252c4b47d8c302a353ce44b495dfe86aba2a72569ad7a8ab71e4a5",
+      "size": 9191
     },
     {
       "path": "scripts/verify_v5_candidate.py",

@@ -77,6 +77,11 @@ source.
    native host without publishing either. The request remains `Pending native
    rendering`: it is not a native measurement, visual review, acceptance
    receipt, or permission to release the presentation.
+   On macOS, `scripts/capture_v5_powerpoint_render.py` runs the existing
+   PowerPoint adapter against an exact staged candidate and writes a private
+   source-bound render record only after the adapter reports the expected
+   document, slide count and PDF. Keep this technical provenance separate from
+   contained PDF measurements and human acceptance.
 7. After separately verifying that PowerPoint rendered the exact staged PPTX,
    transfer the private PDF to an approved Linux parser runner. Run
    `scripts/measure_v5_candidate.py` with the current candidate, pending

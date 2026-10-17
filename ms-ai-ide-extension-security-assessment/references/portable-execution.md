@@ -213,7 +213,20 @@ geometry, nominal font values and candidate PNG previews do not prove rendered
 font size, wrapping, visual quality or acceptance.
 
 The normal builder retains its v4 measured-layout gate and refuses v5 evidence.
-A later reviewed coordinator must bind the freshly exported native Office PDF
-to these exact candidate identities, obtain contained native measurements on an
-approved Linux/Windows worker, and preserve source-bound runtime and human
-acceptance gates before any production promotion.
+On macOS, stage the exact candidate as `PowerPoint-QA/input/candidate.pptx` in
+a new stable QA folder, with an empty `PowerPoint-QA/rendered` sibling. Run
+`scripts/capture_v5_powerpoint_render.py` with the candidate, its pending
+request and digest, the staged input, the bundled Python and a separate private
+(`0700`) output directory. This invokes the reviewed PowerPoint adapter once,
+requires its exact staged-document result, verifies the generated PDF and
+records the adapter, stager and coordinator source digests. A failed adapter,
+unexpected document, changed input, or retained private stage issues no receipt.
+The `0400` record is technical render provenance only, with measurement and
+human acceptance pending. Use the resulting PDF digest as an input to the
+contained Linux/Windows measurement coordinator; never infer acceptance from
+the render record alone.
+
+The normal builder retains its v4 measured-layout gate and refuses v5 evidence.
+A reviewed production finalizer must correlate the native render record and
+contained PDF measurements with these exact candidate identities, then
+preserve source-bound runtime and human acceptance gates before promotion.
