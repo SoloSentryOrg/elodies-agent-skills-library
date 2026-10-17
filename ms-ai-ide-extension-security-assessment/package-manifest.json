@@ -292,8 +292,8 @@
     },
     {
       "path": "scripts/test_verify_v5_candidate.py",
-      "sha256": "b5376de1abf10e32d74e575acd216aa7010a43df4f333497f66f034452c68623",
-      "size": 7508
+      "sha256": "b560195aeda848ae4699c5413d8fdc09f8e88e4a0b9fa1420d27746c4755cf74",
+      "size": 8061
     },
     {
       "path": "scripts/validate_assessment_layout.py",

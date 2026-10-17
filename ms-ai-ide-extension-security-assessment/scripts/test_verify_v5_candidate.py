@@ -5,6 +5,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import os
 import tempfile
 import unittest
 from contextlib import redirect_stderr, redirect_stdout
@@ -23,6 +24,8 @@ def digest(data: bytes) -> str:
     return hashlib.sha256(data).hexdigest()
 
 
+@unittest.skipUnless(os.name == "posix" and hasattr(os, "O_NOFOLLOW"),
+                     "private v5 candidate staging requires POSIX no-follow support")
 class CandidateTransportTests(unittest.TestCase):
     def setUp(self) -> None:
         self.temp = tempfile.TemporaryDirectory()
@@ -138,9 +141,18 @@ class CandidateTransportTests(unittest.TestCase):
                                    str(self.candidate), "--output", str(public_dir / "request.json")]), 1)
         self.assertFalse((public_dir / "request.json").exists())
 
+
+class PortableBoundaryTests(unittest.TestCase):
     def test_nonfinite_json_exponents_are_rejected(self) -> None:
         with self.assertRaisesRegex(ValueError, "non-finite"):
             _json(b'{"number":1e100000}')
+
+    @unittest.skipUnless(os.name == "nt", "Windows-only fail-closed check")
+    def test_windows_cannot_stage_posix_candidate(self) -> None:
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            with self.assertRaisesRegex(ValueError, "POSIX 0700"):
+                prepare(root, root)
 
 
 if __name__ == "__main__":
