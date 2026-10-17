@@ -11,7 +11,10 @@ import unittest
 from contextlib import redirect_stderr, redirect_stdout
 from io import StringIO
 from pathlib import Path
+from unittest import mock
 
+from measure_v5_candidate import main as measure_main
+from measure_v5_candidate import measure
 from validate_pptx_runtime_acceptance import BOUND_FILES
 from verify_v5_candidate import _json, main, prepare
 
@@ -140,6 +143,95 @@ class CandidateTransportTests(unittest.TestCase):
             self.assertEqual(main(["--root", str(self.source), "--candidate-dir",
                                    str(self.candidate), "--output", str(public_dir / "request.json")]), 1)
         self.assertFalse((public_dir / "request.json").exists())
+
+    def _measurement_inputs(self):
+        request = prepare(self.source, self.candidate)
+        request_bytes = encoded(request)
+        request_path = self.request_dir / "native-request.json"
+        request_path.write_bytes(request_bytes)
+        pdf_dir = self.root / "rendered"
+        pdf_dir.mkdir(mode=0o700)
+        pdf_path = pdf_dir / "candidate-powerpoint-full.pdf"
+        pdf_bytes = b"%PDF-1.7\nsynthetic coordinator test; worker is mocked\n"
+        pdf_path.write_bytes(pdf_bytes)
+        policy_path = self.source / "reviewed-parser-identity.json"
+        policy_bytes = encoded({"synthetic": "reviewed in coordinator test"})
+        policy_path.write_bytes(policy_bytes)
+        digests = {"request_sha256": digest(request_bytes), "pdf_sha256": digest(pdf_bytes),
+                   "parser_sha256": digest(policy_bytes)}
+        return request_path, pdf_path, policy_path, digests
+
+    def test_measurement_handoff_binds_current_inputs_without_acceptance(self) -> None:
+        request_path, pdf_path, policy_path, digests = self._measurement_inputs()
+        observed = {"parser_identity_sha256": "f" * 64,
+                    "pages": [[{"name": "title", "minimum_font_pt": 20, "line_count": 1}]]}
+        with mock.patch("measure_v5_candidate.validate_native_pdf_bounded", return_value=observed) as worker:
+            record = measure(self.source, self.candidate, request_path, pdf_path,
+                             policy_path, Path("/trusted/python"), **digests)
+        worker.assert_called_once()
+        self.assertEqual(worker.call_args.args[1], [[self.frame]])
+        self.assertEqual(worker.call_args.kwargs["parser_identity"],
+                         {"synthetic": "reviewed in coordinator test"})
+        self.assertEqual(record["status"], "Pending native provenance and acceptance")
+        self.assertEqual(record["native_pdf_sha256"], digests["pdf_sha256"])
+        self.assertEqual(record["pages"], observed["pages"])
+        self.assertNotIn("Passed", json.dumps(record))
+
+    def test_measurement_handoff_rejects_stale_inputs_and_parser_failure(self) -> None:
+        request_path, pdf_path, policy_path, digests = self._measurement_inputs()
+        with mock.patch("measure_v5_candidate.validate_native_pdf_bounded") as worker:
+            for field in ("request_sha256", "pdf_sha256", "parser_sha256"):
+                changed = dict(digests, **{field: "0" * 64})
+                with self.subTest(field=field), self.assertRaises(ValueError):
+                    measure(self.source, self.candidate, request_path, pdf_path,
+                            policy_path, Path("/trusted/python"), **changed)
+            worker.assert_not_called()
+        with mock.patch("measure_v5_candidate.validate_native_pdf_bounded",
+                        side_effect=ValueError("private PDF content must not be logged")):
+            output = self.request_dir / "measurements.json"
+            error = StringIO()
+            with redirect_stdout(StringIO()), redirect_stderr(error):
+                code = measure_main(["--root", str(self.source), "--candidate-dir", str(self.candidate),
+                                     "--request", str(request_path), "--request-sha256", digests["request_sha256"],
+                                     "--native-pdf", str(pdf_path), "--native-pdf-sha256", digests["pdf_sha256"],
+                                     "--parser-identity", str(policy_path),
+                                     "--parser-identity-sha256", digests["parser_sha256"],
+                                     "--python", "/trusted/python", "--output", str(output)])
+            self.assertEqual(code, 1)
+            self.assertNotIn("private PDF content", error.getvalue())
+            self.assertFalse(output.exists())
+
+    def test_measurement_handoff_detects_mutation_and_writes_private_pending_record(self) -> None:
+        request_path, pdf_path, policy_path, digests = self._measurement_inputs()
+        observed = {"parser_identity_sha256": "f" * 64,
+                    "pages": [[{"name": "title", "minimum_font_pt": 20, "line_count": 1}]]}
+        with (mock.patch("measure_v5_candidate.validate_native_pdf_bounded",
+                         side_effect=lambda *_args, **_kwargs: (pdf_path.write_bytes(b"changed"), observed)[1]),
+              self.assertRaisesRegex(ValueError, "changed during native parsing")):
+            measure(self.source, self.candidate, request_path, pdf_path,
+                    policy_path, Path("/trusted/python"), **digests)
+        pdf_path.write_bytes(b"%PDF-1.7\nsynthetic coordinator test; worker is mocked\n")
+        output = self.request_dir / "measurements.json"
+        with mock.patch("measure_v5_candidate.validate_native_pdf_bounded", return_value=observed), \
+                redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            code = measure_main(["--root", str(self.source), "--candidate-dir", str(self.candidate),
+                                 "--request", str(request_path), "--request-sha256", digests["request_sha256"],
+                                 "--native-pdf", str(pdf_path), "--native-pdf-sha256", digests["pdf_sha256"],
+                                 "--parser-identity", str(policy_path),
+                                 "--parser-identity-sha256", digests["parser_sha256"],
+                                 "--python", "/trusted/python", "--output", str(output)])
+        self.assertEqual(code, 0)
+        self.assertEqual(output.stat().st_mode & 0o777, 0o400)
+        self.assertEqual(json.loads(output.read_bytes())["status"],
+                         "Pending native provenance and acceptance")
+        with mock.patch("measure_v5_candidate.validate_native_pdf_bounded", return_value=observed), \
+                redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            self.assertEqual(measure_main(["--root", str(self.source), "--candidate-dir", str(self.candidate),
+                                           "--request", str(request_path), "--request-sha256", digests["request_sha256"],
+                                           "--native-pdf", str(pdf_path), "--native-pdf-sha256", digests["pdf_sha256"],
+                                           "--parser-identity", str(policy_path),
+                                           "--parser-identity-sha256", digests["parser_sha256"],
+                                           "--python", "/trusted/python", "--output", str(output)]), 1)
 
 
 class PortableBoundaryTests(unittest.TestCase):

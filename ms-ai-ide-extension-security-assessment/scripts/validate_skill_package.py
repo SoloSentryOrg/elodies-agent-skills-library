@@ -29,6 +29,7 @@ REQUIRED_PATHS = {
     "scripts/create_artifact_runtime_receipt.mjs",
     "scripts/stable_regular_file.mjs",
     "scripts/native_pptx_text.py",
+    "scripts/measure_v5_candidate.py",
     "scripts/test_native_pptx_text.py",
     "scripts/test_stable_regular_file.mjs",
     "scripts/test_stable_regular_file.py",

@@ -1368,7 +1368,8 @@ async function buildPrivateV5Candidate(args, workspaceRoot, model, bindings) {
     "validate_assessment_pptx.py", "create_artifact_runtime_receipt.mjs", "native_pptx_text.py",
     "render_presentations_with_powerpoint.applescript", "render_presentations_with_powerpoint.ps1", "stage_office_artifact.py",
     "test_native_pptx_text.py", "test_powerpoint_path_identity.py", "create_pptx_montage.py",
-    "portable_fs.py", "requirements.lock", "test_build_assessment_pptx.py", "verify_v5_candidate.py"]) {
+    "portable_fs.py", "requirements.lock", "test_build_assessment_pptx.py", "verify_v5_candidate.py",
+    "measure_v5_candidate.py"]) {
     sources[`scripts/${name}`] = await hashRegularFile(path.join(SCRIPT_DIR, name), "candidate source");
   }
   const output = path.join(directory, "candidate.pptx");

@@ -1018,6 +1018,8 @@ class AssessmentPptxTests(unittest.TestCase):
                 "scripts/secure_pptx_stage_bundle.py",
                 "scripts/validate_assessment_pptx.py",
                 "scripts/test_build_assessment_pptx.py",
+                "scripts/verify_v5_candidate.py",
+                "scripts/measure_v5_candidate.py",
             )
             receipt_payload = json.loads(receipt.read_text(encoding="utf-8"))
             acceptance = {

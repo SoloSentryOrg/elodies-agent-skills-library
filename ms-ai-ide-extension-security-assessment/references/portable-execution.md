@@ -90,6 +90,11 @@ to all authored text. Single-line title requirements come from the authoring
 path. The retained v4-only gate remains fail-closed; the current v5 renderer
 lacks the former resolved font and line-count evidence. These source checks do
 not establish native rendering acceptance or update historical acceptance.
+The private v5 measurement handoff in `scripts/measure_v5_candidate.py`
+re-verifies the current candidate and pending request, expected PDF and reviewed
+parser-policy hashes before calling the contained PDF worker. It re-reads the
+inputs afterward, writes only pending evidence into a private directory, and
+never replaces the production layout gate or the native/human closeout.
 
 - `scripts/validate_assessment_pptx.py` rejects macros, ActiveX, embedded
   objects, review content, unsafe external relationships, and non-neutral

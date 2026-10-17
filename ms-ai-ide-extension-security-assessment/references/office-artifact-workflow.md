@@ -77,6 +77,16 @@ source.
    native host without publishing either. The request remains `Pending native
    rendering`: it is not a native measurement, visual review, acceptance
    receipt, or permission to release the presentation.
+7. After separately verifying that PowerPoint rendered the exact staged PPTX,
+   transfer the private PDF to an approved Linux parser runner. Run
+   `scripts/measure_v5_candidate.py` with the current candidate, pending
+   request, their expected SHA-256 identities, the reviewed parser-policy file
+   and its SHA-256, an explicit trusted Python, and the expected PDF SHA-256.
+   It rechecks source and file identities, invokes the bounded native parser,
+   and writes only a private read-only record marked `Pending native provenance
+   and acceptance`. Keep the PowerPoint execution proof, every-slide visual
+   review, and human acceptance separate; this measurement is not a `Passed`
+   runtime receipt or authority to publish.
 
 ## Spreadsheet and PDF routes
 
