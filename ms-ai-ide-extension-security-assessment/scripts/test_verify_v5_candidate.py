@@ -19,6 +19,8 @@ from capture_v5_powerpoint_render import MAX_ADAPTER_OUTPUT, _run_adapter, captu
 from capture_v5_powerpoint_render import main as capture_main
 from measure_v5_candidate import main as measure_main
 from measure_v5_candidate import measure
+from reconcile_v5_native_evidence import main as reconcile_main
+from reconcile_v5_native_evidence import reconcile
 from validate_pptx_runtime_acceptance import BOUND_FILES
 from verify_v5_candidate import _json, main, prepare
 
@@ -169,6 +171,115 @@ class CandidateTransportTests(unittest.TestCase):
                                            "--output", str(output)]), 1)
         runner.assert_called_once()
         self.assertFalse(output.exists())
+
+    def _reconciliation_inputs(self) -> tuple[dict[str, object], dict[str, object]]:
+        request_path, _, _, request = self._native_render_inputs()
+        (self.source / "scripts/reconcile_v5_native_evidence.py").write_bytes(b"synthetic reconciler\n")
+        pdf_path = self.request_dir / "candidate-powerpoint-full.pdf"
+        pdf_path.write_bytes(b"%PDF-1.7\n" + b"synthetic measured PDF" * 4)
+        parser_path = self.request_dir / "parser-policy.json"
+        parser_path.write_bytes(encoded({"synthetic": "reviewed parser"}))
+        sources = {
+            "adapter_sha256": "scripts/render_presentations_with_powerpoint.applescript",
+            "stager_sha256": "scripts/stage_office_artifact.py",
+            "coordinator_sha256": "scripts/capture_v5_powerpoint_render.py",
+        }
+        identity = {
+            "candidate_manifest_sha256": request["candidate_manifest_sha256"],
+            "candidate_pptx_sha256": request["candidate_pptx_sha256"],
+            "measurement_request_sha256": digest(encoded(request)),
+            "native_pdf_sha256": digest(pdf_path.read_bytes()),
+        }
+        render = {
+            "schema": "solosentry.pptx.v5-native-render/v1",
+            "status": "Native adapter verified; measurement and acceptance pending",
+            **identity, "native_pdf_file": pdf_path.name,
+            "adapter_reported_slide_count": 1, "platform": "darwin",
+            "exact_document_closed": True, "native_python_sha256": "a" * 64,
+            "human_acceptance": "Pending",
+            **{key: digest((self.source / relative).read_bytes())
+               for key, relative in sources.items()},
+        }
+        measured = {
+            "schema": "solosentry.pptx.v5-native-measurements/v1",
+            "status": "Pending native provenance and acceptance",
+            **identity, "parser_policy_sha256": digest(parser_path.read_bytes()),
+            "parser_identity_sha256": "b" * 64,
+            "native_powerpoint_closeout": "Pending", "human_acceptance": "Pending",
+            "pages": [[{"name": "title", "minimum_font_pt": 18.0, "line_count": 1}]],
+        }
+        render_path = self.request_dir / "native-render.json"
+        measurement_path = self.request_dir / "native-measurement.json"
+        render_path.write_bytes(encoded(render))
+        measurement_path.write_bytes(encoded(measured))
+        inputs = {
+            "root": self.source, "candidate_dir": self.candidate,
+            "request_path": request_path, "pdf_path": pdf_path,
+            "render_path": render_path, "measurement_path": measurement_path,
+            "parser_path": parser_path, "python_executable": Path(sys.executable).resolve(),
+            "request_sha256": digest(encoded(request)),
+            "pdf_sha256": identity["native_pdf_sha256"],
+            "render_sha256": digest(render_path.read_bytes()),
+            "measurement_sha256": digest(measurement_path.read_bytes()),
+            "parser_sha256": digest(parser_path.read_bytes()),
+        }
+        return inputs, measured
+
+    def test_reconciliation_requires_fresh_measurement_and_keeps_acceptance_pending(self) -> None:
+        inputs, measured = self._reconciliation_inputs()
+        with mock.patch("reconcile_v5_native_evidence.measure", return_value=measured) as parser:
+            proof = reconcile(**inputs)
+        parser.assert_called_once()
+        self.assertEqual(proof["technical_validation"], "Passed")
+        self.assertEqual(proof["native_powerpoint_closeout"], "Verified")
+        self.assertEqual(proof["measured_frames"], 1)
+        self.assertEqual(proof["production_publication"], "Pending")
+        self.assertEqual(proof["human_acceptance"], "Pending")
+
+    def test_reconciliation_rejects_false_closeout_and_changed_measurements(self) -> None:
+        inputs, measured = self._reconciliation_inputs()
+        render = json.loads(inputs["render_path"].read_text())
+        render["exact_document_closed"] = False
+        inputs["render_path"].write_bytes(encoded(render))
+        inputs["render_sha256"] = digest(inputs["render_path"].read_bytes())
+        with mock.patch("reconcile_v5_native_evidence.measure") as parser:
+            with self.assertRaisesRegex(ValueError, "closeout"):
+                reconcile(**inputs)
+            parser.assert_not_called()
+        render["exact_document_closed"] = True
+        inputs["render_path"].write_bytes(encoded(render))
+        inputs["render_sha256"] = digest(inputs["render_path"].read_bytes())
+        changed = dict(measured)
+        changed["pages"] = [[{"name": "title", "minimum_font_pt": 8.0, "line_count": 1}]]
+        inputs["measurement_path"].write_bytes(encoded(changed))
+        inputs["measurement_sha256"] = digest(inputs["measurement_path"].read_bytes())
+        output = self.request_dir / "reconciled.json"
+        argv = ["--root", str(self.source), "--candidate-dir", str(self.candidate),
+                "--request", str(inputs["request_path"]), "--native-pdf", str(inputs["pdf_path"]),
+                "--render-record", str(inputs["render_path"]),
+                "--measurement-record", str(inputs["measurement_path"]),
+                "--parser-identity", str(inputs["parser_path"]),
+                "--python", str(inputs["python_executable"]), "--output", str(output),
+                "--request-sha256", inputs["request_sha256"],
+                "--native-pdf-sha256", inputs["pdf_sha256"],
+                "--render-sha256", inputs["render_sha256"],
+                "--measurement-sha256", inputs["measurement_sha256"],
+                "--parser-sha256", inputs["parser_sha256"]]
+        with mock.patch("reconcile_v5_native_evidence.measure", return_value=measured) as parser, \
+                redirect_stdout(StringIO()), redirect_stderr(StringIO()):
+            self.assertEqual(reconcile_main(argv), 1)
+        parser.assert_called_once()
+        self.assertFalse(output.exists())
+
+    def test_reconciliation_rejects_source_mutation_during_parser_run(self) -> None:
+        inputs, measured = self._reconciliation_inputs()
+        source = self.source / "scripts/reconcile_v5_native_evidence.py"
+        def mutate_source(*_args, **_kwargs):
+            source.write_bytes(b"changed synthetic reconciler\n")
+            return measured
+        with (mock.patch("reconcile_v5_native_evidence.measure", side_effect=mutate_source),
+              self.assertRaisesRegex(ValueError, "reconciler source changed")):
+            reconcile(**inputs)
 
     def test_pending_request_binds_sources_and_never_claims_acceptance(self) -> None:
         request = prepare(self.source, self.candidate)

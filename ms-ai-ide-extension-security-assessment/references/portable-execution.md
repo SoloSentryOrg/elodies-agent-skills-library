@@ -226,6 +226,16 @@ human acceptance pending. Use the resulting PDF digest as an input to the
 contained Linux/Windows measurement coordinator; never infer acceptance from
 the render record alone.
 
+On the same approved contained Linux parser host, reconcile the exact private render
+record and measurement record with `scripts/reconcile_v5_native_evidence.py`.
+The coordinator reruns the PDF measurement against the current candidate and
+refuses mismatched identities, altered evidence or incomplete Office closeout.
+Its private `0400` output records a technical pass while production publication
+and human, business and residual-risk acceptance remain pending. Do not copy
+the candidate to a production destination on the strength of this record alone.
+The reconciliation CLI currently requires POSIX private-file semantics; native
+Windows Office evidence remains a separate requirement.
+
 The normal builder retains its v4 measured-layout gate and refuses v5 evidence.
 A reviewed production finalizer must correlate the native render record and
 contained PDF measurements with these exact candidate identities, then

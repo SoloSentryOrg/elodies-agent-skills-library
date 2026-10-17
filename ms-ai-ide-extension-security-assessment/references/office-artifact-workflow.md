@@ -92,6 +92,16 @@ source.
    and acceptance`. Keep the PowerPoint execution proof, every-slide visual
    review, and human acceptance separate; this measurement is not a `Passed`
    runtime receipt or authority to publish.
+8. On the approved contained Linux parser host, run
+   `scripts/reconcile_v5_native_evidence.py` with the exact candidate, request,
+   PDF, native render record, measurement record, parser policy, trusted Python,
+   and expected digests. It reruns the bounded parser and requires the stored
+   measurement to match the fresh result before writing a private technical
+   reconciliation record. Its `technical_validation: Passed` applies only to
+   the correlated render and measurement. Production publication, human visual,
+   business, and residual-risk acceptance remain `Pending` and require their
+   separate gates. The reconciliation CLI's private-file contract is POSIX-only;
+   Windows Office acceptance remains a separate native check.
 
 ## Spreadsheet and PDF routes
 

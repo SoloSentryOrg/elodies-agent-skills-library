@@ -42,13 +42,13 @@
     },
     {
       "path": "references/office-artifact-workflow.md",
-      "sha256": "05141e7a2c10f0b0150bba9518da5a73dfc4f114242e81163a32d81b9e82e4eb",
-      "size": 6774
+      "sha256": "ff0a36a08c77fa0b15863adc938d32fa39263ce148e94094aa242f67787785c3",
+      "size": 7518
     },
     {
       "path": "references/portable-execution.md",
-      "sha256": "2583e7a25674dbd70c3806eaaf8bf9ce8ac63573d3e91238e08b53a4ed671d22",
-      "size": 13768
+      "sha256": "355ad48727a2b184d6003703bca7ebe549da410b9508af65236262d7034a366c",
+      "size": 14460
     },
     {
       "path": "references/prerequisites.md",
@@ -174,6 +174,11 @@
       "path": "scripts/portable_fs.py",
       "sha256": "c4664cde1e52b0de9e7dc46413bc305270acd0f4be1a7b98e0a0f004c21835e7",
       "size": 10481
+    },
+    {
+      "path": "scripts/reconcile_v5_native_evidence.py",
+      "sha256": "bb9031c579930d98d263bef2af3072f1917fa257da6ae56c06d97285b134f50a",
+      "size": 10377
     },
     {
       "path": "scripts/render_presentations_with_powerpoint.applescript",
@@ -302,8 +307,8 @@
     },
     {
       "path": "scripts/test_verify_v5_candidate.py",
-      "sha256": "1cd9ea202006434c1058f7cc184be05425c98535426e77c6caba9b2ce4a37c62",
-      "size": 20442
+      "sha256": "fe75759e7ae22def27419e7583188991701a2c6c09a5d90a34b14ae7536d1541",
+      "size": 27023
     },
     {
       "path": "scripts/validate_assessment_layout.py",
@@ -327,8 +332,8 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "01903ee562252c4b47d8c302a353ce44b495dfe86aba2a72569ad7a8ab71e4a5",
-      "size": 9191
+      "sha256": "033f8366e07a35c73cfc7d431daa26e5cc3d7a51160d2b3f41d36df80ef25c87",
+      "size": 9238
     },
     {
       "path": "scripts/verify_v5_candidate.py",
