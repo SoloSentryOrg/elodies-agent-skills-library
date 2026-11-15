@@ -7,8 +7,8 @@
     },
     {
       "path": "pptx-runtime-acceptance.json",
-      "sha256": "e6a1e7f7932b27eb0b8467c5b2b0910bb3bf241336e2acd5a4f1dc5f8eb14ba0",
-      "size": 3690
+      "sha256": "d457293ab657100438a7d185fdae8487d7068c907c97052234912395074eb29f",
+      "size": 3691
     },
     {
       "path": "references/authoritative-report-standard.md",
@@ -107,13 +107,13 @@
     },
     {
       "path": "scripts/build_assessment_docx.py",
-      "sha256": "f8b028a37eb9e4517e71510b49d562ab898c763070d9f9fab7dda7ad24d89b65",
-      "size": 67141
+      "sha256": "ffcec7c0a6a8baebd4f1fdacd72a22df7d68f9ec6801ed7c5ded1e88f9548695",
+      "size": 67143
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "b03b1a13284b86c317a8f0b1c15ef6b81def080a5ffe955b2c8315730f499e68",
-      "size": 83567
+      "sha256": "badc9920d6bac8076b21fa872d5f749aced84bf3ad0651fd157173bbfab0fb2f",
+      "size": 83566
     },
     {
       "path": "scripts/build_release_archive.py",
@@ -172,8 +172,8 @@
     },
     {
       "path": "scripts/native-pdfium-tests.lock",
-      "sha256": "4892e119e61ca0f0a1ac8c8aca599afaed86fd6850f638757a3e8a8d6d3735e9",
-      "size": 423
+      "sha256": "e3ca5965b1397790b774531a403ffa9aa91f8a54d13facb87d04d78fbf9041cb",
+      "size": 508
     },
     {
       "path": "scripts/native_pptx_text.py",
@@ -212,13 +212,13 @@
     },
     {
       "path": "scripts/requirements.in",
-      "sha256": "9a1943631d9d51e0ba6f508f25f3600bb0c9f563de30e4f5450f00c8748d4168",
+      "sha256": "803865337f2e4d5d9c9a1f52200d74ee9288296817c1b523b385534422b4ce2b",
       "size": 177
     },
     {
       "path": "scripts/requirements.lock",
-      "sha256": "c5caf205040cf99d8fbb84673a00be227d0837b9e3e3b5dd8845afebda525473",
-      "size": 31062
+      "sha256": "edd92150edd144daf6597c3e1fd287923cd29a431025567a5a0078d6d258d645",
+      "size": 34161
     },
     {
       "path": "scripts/runtime-requirements.json",
@@ -252,8 +252,8 @@
     },
     {
       "path": "scripts/test_build_assessment_docx.py",
-      "sha256": "e96bb468f74c7b322b0c8b86498a4fcf27fa546b13e1b25dac895968f23c5af7",
-      "size": 23139
+      "sha256": "3e14d5d5c180ab6ffa3fa71513aa9423653c281ffc1a9d5190916b3ad912671c",
+      "size": 25193
     },
     {
       "path": "scripts/test_build_assessment_pptx.py",
@@ -282,7 +282,7 @@
     },
     {
       "path": "scripts/test_portable_package.py",
-      "sha256": "620f47919356b5012449a930dbff10f8df736490a74fe30a75dedad683a26cdc",
+      "sha256": "1d64eddd7e3799229023aadf800405567d2a11f1a6824c871dd69a4a9ec32439",
       "size": 6051
     },
     {
@@ -342,7 +342,7 @@
     },
     {
       "path": "scripts/validate_skill_package.py",
-      "sha256": "29b8d7d984a73daaec9be7ecce1708a4af854636959565f8a7640be7d0f72972",
+      "sha256": "fcb49c606a0a221b95bd88eb441f84264f0db8fac81d20a1c3f31b2e6877e383",
       "size": 9317
     },
     {
@@ -352,7 +352,7 @@
     },
     {
       "path": "SKILL.md",
-      "sha256": "d7181d7e5e923defb0b75286598c8a5da3cb07b712effef9161b7c92c03fe11a",
+      "sha256": "d5399e29a54b92aecfc47c009e352633c57c90368f9bc273376ca608544d39f2",
       "size": 12683
     },
     {
@@ -364,8 +364,8 @@
   "schema_version": 1,
   "skill": "ms-ai-ide-extension-security-assessment",
   "source": {
-    "ref": "ms-ai-ide-extension-security-assessment-v1.4.7",
+    "ref": "ms-ai-ide-extension-security-assessment-v1.4.8",
     "repository": "https://github.com/SoloSentryOrg/elodies-agent-skills-library"
   },
-  "version": "1.4.7"
+  "version": "1.4.8"
 }

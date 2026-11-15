@@ -34,10 +34,10 @@ environment and finish all previous test processes before refreshing its
 manifest. Run these steps sequentially after the source edits:
 
 ```bash
-python3 -B ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py --write-manifest --expected-version 1.4.7
-python3 -B ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py --expected-version 1.4.7
+python3 -B ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py --write-manifest --expected-version 1.4.8
+python3 -B ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py --expected-version 1.4.8
 python3 -B -m unittest discover -s ms-ai-ide-extension-security-assessment/scripts -p 'test_*.py'
-python3 -B ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py --expected-version 1.4.7
+python3 -B ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py --expected-version 1.4.8
 ```
 
 On Windows, use `python` in place of `python3`. The final validation must pass
@@ -62,3 +62,27 @@ Report vulnerabilities privately as described in [SECURITY.md](SECURITY.md). Do 
 ## Licence
 
 This repository is licensed under the [MIT License](LICENSE).
+
+### Python dependency evidence
+
+The existing Repository Security workflow scans all three complete Python hash locks (portable assessment, M365 handoff
+and native PDF parser) before installation using the official OSV API. It runs on pull requests,
+protected-main pushes, manual dispatch and Mondays at 05:31 UTC. Findings block;
+network failures, incomplete/paginated or malformed responses, unsupported lock
+records and missing evidence fail closed. No dependency exception or ignored
+advisory is configured. Query, raw response, lock hashes and result are retained
+for fourteen days. Advisory records can include aliases and are not a distinct
+CVE count. No public report or package is published.
+
+Run locally from a clean tracked-source checkout with a new evidence directory:
+
+```sh
+python3 scripts/check-python-dependencies.py --output /absolute/new/evidence-dir
+```
+
+Exit 0 establishes a complete empty OSV result for those exact versions at scan
+time; exit 1 reports findings, and exit 2 means complete clean evidence was not
+established. This gate complements install, source, descriptor, native Office,
+resource-limit and runtime-acceptance checks. The first real scheduled observation
+after deployment remains separate from manual/PR validation in security issue
+[#34](https://github.com/SoloSentryOrg/elodies-agent-skills-library/issues/34).

@@ -828,7 +828,7 @@ function addArchitectureSlides(presentation, model, number) {
   });
   nodes.forEach((node, index) => {
     const position = positions.get(node);
-    addText(slide, `architecture-node-label-${index}`, node, { left: position.left + 12, top: position.top + 12, width: position.width - 24, height: position.height - 24 }, 20, { bold: true, alignment: "center", verticalAlignment: "middle" });
+    addText(slide, `architecture-node-label-${index}`, node, { left: position.left + 12, top: position.top + 8, width: position.width - 24, height: position.height - 16 }, 20, { bold: true, alignment: "center", verticalAlignment: "middle" });
   });
   setNotes(slide, model, model.derivative_sources.figure);
   const chunks = [];
