@@ -7,8 +7,8 @@
     },
     {
       "path": "pptx-runtime-acceptance.json",
-      "sha256": "e6a1e7f7932b27eb0b8467c5b2b0910bb3bf241336e2acd5a4f1dc5f8eb14ba0",
-      "size": 3690
+      "sha256": "d457293ab657100438a7d185fdae8487d7068c907c97052234912395074eb29f",
+      "size": 3691
     },
     {
       "path": "references/authoritative-report-standard.md",
@@ -112,8 +112,8 @@
     },
     {
       "path": "scripts/build_assessment_pptx.mjs",
-      "sha256": "b03b1a13284b86c317a8f0b1c15ef6b81def080a5ffe955b2c8315730f499e68",
-      "size": 83567
+      "sha256": "badc9920d6bac8076b21fa872d5f749aced84bf3ad0651fd157173bbfab0fb2f",
+      "size": 83566
     },
     {
       "path": "scripts/build_release_archive.py",
