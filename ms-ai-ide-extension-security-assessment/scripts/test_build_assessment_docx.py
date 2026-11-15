@@ -158,6 +158,44 @@ def _model() -> dict[str, object]:
 
 
 class AssessmentDocxBuilderTests(unittest.TestCase):
+    def _injected_scope_sections(self, raw):
+        from docx import Document
+
+        model = MODULE.validate_report_model(raw)
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            output = root / 'assessment.docx'
+            MODULE.build_report(model, output, root / 'figure.png')
+            paragraphs = Document(output).paragraphs
+        current_heading = None
+        injected = []
+        for paragraph in paragraphs:
+            if paragraph.style.name.startswith('Heading'):
+                current_heading = paragraph.text
+            if paragraph.text.startswith('Decision: Not applicable. Visual Studio is unsupported'):
+                injected.append(current_heading)
+        return injected
+
+    def test_scope_paragraph_is_only_in_part_ii_for_heading_variants(self):
+        for heading in ['Part II — Visual Studio Assessment', 'PART II - Visual Studio Assessment', 'part ii: Visual Studio Assessment', 'Part II']:
+            with self.subTest(heading=heading):
+                raw = _model()
+                part_ii = next(x for x in raw['sections'] if x['heading'] == 'Part II — Visual Studio Assessment')
+                part_ii['heading'] = heading
+                self.assertEqual(self._injected_scope_sections(raw), [heading])
+
+    def test_similar_roman_part_names_never_receive_visual_studio_scope(self):
+        raw = _model()
+        for number, heading in enumerate(['Part IIA — Unrelated', 'Part II2 — Unrelated', 'Part IIII — Unrelated', 'Part VIII — Unrelated']):
+            raw['sections'].append({'id': f'boundary-{number}', 'heading': heading, 'level': 1, 'paragraphs': ['Unrelated section content.'], 'bullets': [], 'tables': []})
+        self.assertEqual(self._injected_scope_sections(raw), ['Part II — Visual Studio Assessment'])
+
+    def test_no_out_of_scope_paragraph_when_visual_studio_is_assessed(self):
+        raw = _model()
+        raw['ide_scope'].append('Visual Studio')
+        self.assertEqual(self._injected_scope_sections(raw), [])
+
+
     def test_revision_history_accepts_correction_and_requires_latest_version(self) -> None:
         raw = _model()
         raw["document_version"] = "1.1"

@@ -6,6 +6,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '31 5 * * 1'
 
 permissions:
   contents: read
@@ -33,6 +35,23 @@ jobs:
 
       - name: Validate repository and skills
         run: ruby scripts/validate_repository.rb
+
+      - name: Scan complete Python lockfiles
+        id: python-dependencies
+        env:
+          PYTHONDONTWRITEBYTECODE: "1"
+        run: >-
+          python3 scripts/check-python-dependencies.py
+          --output "${{ runner.temp }}/python-dependencies"
+
+      - name: Retain dependency-scan evidence
+        if: ${{ always() && steps.python-dependencies.outcome != 'skipped' }}
+        uses: actions/upload-artifact@b7c566a772e6b6bfb58ed0dc250532a479d7789f # v6.0.0
+        with:
+          name: python-dependency-evidence
+          path: ${{ runner.temp }}/python-dependencies
+          if-no-files-found: error
+          retention-days: 14
 
       - name: Install pinned portable-skill dependencies
         run: >-
@@ -71,7 +90,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
           python3 ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py
-          --expected-version 1.4.7
+          --expected-version 1.4.8
 
       - name: Run portable skill regression tests
         env:
@@ -141,7 +160,7 @@ jobs:
           PYTHONDONTWRITEBYTECODE: "1"
         run: >-
           python ms-ai-ide-extension-security-assessment/scripts/validate_skill_package.py
-          --expected-version 1.4.7
+          --expected-version 1.4.8
 
       - name: Run portable regression tests on Windows
         env:

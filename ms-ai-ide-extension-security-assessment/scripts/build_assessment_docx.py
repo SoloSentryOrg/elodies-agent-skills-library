@@ -1242,7 +1242,7 @@ def _build_report_owned(
     for section in model["sections"]:
         assert isinstance(section, dict)
         doc.add_heading(str(section["heading"]), level=int(section["level"]))
-        if str(section["heading"]).casefold().startswith("part ii") and "Visual Studio" not in model["ide_scope"]:
+        if re.match(r"part ii\b", str(section["heading"]).casefold()) and "Visual Studio" not in model["ide_scope"]:
             doc.add_paragraph(
                 "Decision: Not applicable. Visual Studio is unsupported and out of scope for this VS Code extension. "
                 "Evidence: the Marketplace manifest declares the Visual Studio Code engine only. Limitation: no Visual Studio package or runtime was assessed. "
@@ -1394,7 +1394,7 @@ def write_build_manifest(
         "schema_version": 1,
         "assessment": model["assessment"],
         "run_key": model["run_key"],
-        "parent_skill_version": "1.4.7",
+        "parent_skill_version": "1.4.8",
         "design_preset": "standard_business_brief",
         "header_pattern": "memo_masthead",
         "layout_policy": {
